@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DG declarations · ECT Delta</title>
+<meta name="author" content="Emilio Solanes">
+<meta name="description" content="Simulation of Dangerous Goods Declarations for six containers on MSC Gülsün at Hutchison Ports ECT Delta, Rotterdam, exchanged between shipper, forwarder, carrier, terminal and harbour master as DCSA DGD 1.0 draft messages.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Sans:wght@400;500;600&display=swap">
+<style>
+/*STYLES*/
+</style>
+</head>
+<body>
+<div id="app">
+  <section id="stage" aria-label="Declaration chain">
+    <svg id="wires" aria-hidden="true"></svg>
+    <div id="desks"></div>
+    <div id="doc" class="view-pane" hidden></div>
+    <div id="boxv" class="view-pane" hidden></div>
+    <div id="credit">by emilio.solanes</div>
+
+    <div id="brand" class="hud">
+      <div class="eyebrow">Hutchison Ports ECT Delta · Rotterdam</div>
+      <h1>DG declarations</h1>
+      <div id="lens" role="group" aria-label="Whose copy you see">
+        <button type="button" data-lens="ALL" aria-pressed="true">All<small>every party</small></button>
+        <button type="button" data-lens="SHP" aria-pressed="false">Shipper<small id="lens-shp">Veldmeer</small></button>
+        <button type="button" data-lens="MSC" aria-pressed="false">MSC<small>carrier</small></button>
+        <button type="button" data-lens="ECT" aria-pressed="false">ECT Delta<small>terminal</small></button>
+      </div>
+      <div id="clock"><span class="d" id="clock-d">Sun 18 Oct</span><span class="t" id="clock-t">13:30</span></div>
+      <div class="tag"><i></i>Simulated · DCSA DGD 1.0 draft messages</div>
+    </div>
+
+    <div id="guide" class="guide" hidden role="region" aria-label="Guided tour" aria-live="polite">
+      <div class="g-top"><span class="g-n" id="guide-n">1 / 11</span><button type="button" class="g-skip" id="guide-skip">Skip tour</button></div>
+      <p id="guide-text"></p>
+      <div class="g-acts"><button type="button" class="g-btn" id="guide-back">Back</button><button type="button" class="g-btn primary" id="guide-next">Next</button></div>
+    </div>
+
+    <div id="views" class="hud" role="group" aria-label="Stage view">
+      <button type="button" data-view="chain" aria-pressed="true">Chain</button>
+      <button type="button" data-view="doc" aria-pressed="false">Document</button>
+      <button type="button" data-view="box" aria-pressed="false">Box</button>
+    </div>
+  </section>
+
+  <div id="card" class="hud" hidden aria-live="polite"></div>
+
+  <section id="bottom" aria-label="Timeline">
+    <div class="panel">
+      <div class="controls">
+        <button id="play" type="button" aria-label="Pause"></button>
+        <button id="tour" class="btn" type="button">Tour</button>
+        <div class="speed" role="group" aria-label="Simulation speed">
+          <button type="button" data-speed="10" aria-pressed="true">10 min/s</button>
+          <button type="button" data-speed="30" aria-pressed="false">30 min/s</button>
+          <button type="button" data-speed="90" aria-pressed="false">90 min/s</button>
+          <button type="button" data-speed="240" aria-pressed="false">4 h/s</button>
+        </div>
+        <div class="moments" id="moments" aria-label="Key moments"></div>
+      </div>
+      <div class="gantt" id="gantt"></div>
+      <div class="legend" id="g-legend" style="margin-top:8px"></div>
+    </div>
+  </section>
+
+  <aside id="side" aria-label="Live panels">
+    <div class="panel" id="p-decl">
+      <header><h3>Declarations</h3><span class="meta" id="d-meta"></span></header>
+      <div class="vlist" id="dlist"></div>
+    </div>
+
+    <div class="panel" id="p-ex">
+      <header><h3>DGD exchange</h3><span class="meta" id="x-meta">All parties · DGD 1.0</span></header>
+      <div class="stats">
+        <div class="stat"><div class="v" id="x-sent">0</div><div class="k">messages in the last 24 h</div></div>
+        <div class="stat"><div class="v" id="x-open">0</div><div class="k" id="x-open-k">waiting for review</div></div>
+        <div class="stat"><div class="v" id="x-acc">0<small>min</small></div><div class="k" id="x-acc-k">last issue to MSC acceptance</div></div>
+      </div>
+      <div class="erpa-bar" id="x-bar"></div>
+      <div class="legend" id="x-legend"></div>
+      <div class="outcomes" id="x-out"></div>
+    </div>
+
+    <div class="panel" id="p-what">
+      <header><h3>What if</h3><span class="meta">MSCU 482901 7 after the gate stop</span></header>
+      <div class="wrows" id="wi-rows"></div>
+      <div class="wres" id="wi-res"></div>
+      <div class="wtrace mono" id="wi-trace"></div>
+      <div class="wacts"><button class="btn" type="button" id="wi-replay">Replay the gate stop</button><button class="btn" type="button" id="wi-reset">Reset</button></div>
+    </div>
+
+    <div class="panel" id="p-parties">
+      <header><h3>Parties</h3><span class="meta">Push or pull, per flow</span></header>
+      <div class="plist" id="plist"></div>
+      <div class="spark" id="x-spark" aria-label="Messages per hour, last 24 hours"></div>
+      <div class="legend" style="margin-top:4px"><span>Messages per hour, last 24 h</span></div>
+    </div>
+
+    <div class="panel" id="p-alerts">
+      <header><h3>Alerts</h3><span class="meta" id="a-meta">Latest first</span></header>
+      <div class="alerts" id="alerts"></div>
+    </div>
+
+    <div class="panel" id="p-feed">
+      <header><h3>Message stream</h3><span class="meta">Tap a message for its payload</span></header>
+      <div class="feed" id="feed"></div>
+    </div>
+
+    <div class="panel">
+      <details class="about" id="about">
+        <summary>About this model</summary>
+        <p>Personal project by emilio.solanes. Simulated data. Not affiliated with or endorsed by the companies shown.</p>
+        <p>Six export containers for MSC Gülsün at Hutchison Ports ECT Delta, Rotterdam, from Thursday 15 to Tuesday 20 October 2026. Every declaration, request and feedback item is exchanged as a DCSA Dangerous Goods Declaration (DGD) 1.0 message. DGD 1.0 is still in development; this model follows the alpha snapshot of 6 November 2026.</p>
+        <ul>
+          <li><b>Real:</b> MSC Gülsün, MSC and Hutchison Ports ECT Delta; UN numbers, proper shipping names, IMDG classes and EmS codes; the DGD 1.0 endpoints, resource names and vocabularies (declaration status DRAFT, FINAL, WITHDRAWN; review status PENDING, ACCEPTED, REJECTED; severity ERROR, WARN, INFO; RFC 6901 property paths).</li>
+          <li><b>Computed, not scripted:</b> shipper issue times and the gate stop are inputs. Everything else follows from rules: Haventrek relays in 2 min; MSC checks a revision in 20 min and reports an accepted FINAL revision to the Harbour Master 3 min later; a new UN number is a reclassification, so r3 goes to MSC's DG desk, which re-checks stowage and segregation (45 min by default); ECT Delta pulls <span class="mono">GET /dgds</span> per booking with <span class="mono">issuedDateTimeMin</span> set 10 min before its previous poll, so a revision still being relayed is never missed, and drops the repeats this creates by reference and revision; shippers pull feedback the same way with a 5 min overlap and drop repeats by feedback ID; ECT Delta checks a FINAL revision 8 min after pulling it; the gate releases a held box 12 min after both ECT Delta has accepted the correction and MSC has re-approved the booking. The What if panel changes the polling intervals, the correction time and the re-approval time and recalculates whether the box makes the cut-off.</li>
+          <li><b>Assumed:</b> a DG cut-off at ECT Delta on Sunday 18:00; the rule timings above; a gate check that reads hazard placards; all times, volumes and weights; a weekly service, so a rolled box waits 7 days.</li>
+          <li><b>Party views:</b> Shipper, MSC and ECT Delta show only what that party has received or sent by the clock time. The physical lane under the chain is the world as it is, not any party's knowledge. All is the ops floor view across every party.</li>
+          <li><b>Fictional:</b> Veldmeer Chemicals, Oostkade Coatings, Kadeveld Energy, Zeelwijk Process, Akkerzand Agro, Haventrek Logistics and their Singapore consignees; all booking, request and declaration references, seal numbers and the voyage number. Emergency contacts use the reserved .example domain. Container numbers carry valid check digits and are made up.</li>
+          <li><b>Not modelled:</b> stowage and segregation planning; the Document Exchange transfer of referenced documents; registration, authorization and security; non-API exchange (UC9); MSC Gülsün's own port call, which video 1 covers.</li>
+          <li><b>Known simplifications:</b> the Harbour Master receives a direct push, as in a port without a community system, while in Rotterdam dangerous goods on board are reported through Portbase's Notification Dangerous Goods service; MSC's re-approval reaches the gate outside DGD (an updated load list) and is not drawn as a message; a misdeclared UN number can also bring a fee or a refusal by the terminal, which is not modelled; routine checks take a fixed 20 min; today most of this exchange runs on email, PDFs, portals and EDI, and this model shows how it would run on DGD 1.0.</li>
+          <li><b>Payloads:</b> bodies carry the fields this story uses plus those the DGD 1.0 conformance content checks ask for (parties, seals, certificates, emergency contact); other optional properties are left out. They validate against the alpha OpenAPI schema. Bodies follow the generated OpenAPI wrappers (<span class="mono">DGDeclarations</span>, <span class="mono">DGDFeedbacks</span>, <span class="mono">DGDRequests</span>). DGD defines no sending-party headers, so sender and receiver come from <span class="mono">submissionOriginator</span>, <span class="mono">forwardingEvents</span> and the feedback <span class="mono">originatingParty</span>.</li>
+          <li><b>Colours:</b> Requested purple, Declared blue, Feedback amber, Accepted green. Accepted is a feedback item whose review status is ACCEPTED; it never changes the declaration's own status, which only the shipper sets. Red marks an ERROR, a rejection or a held box.</li>
+        </ul>
+        <p>Sources: DCSA DGD 1.0.0 alpha package (use cases, information model guide, technical appendix, examples, OpenAPI). <a href="https://support.portbase.com/en/services/notification-dangerous-goods" target="_blank" rel="noopener">Portbase Notification Dangerous Goods</a>, <a href="https://english.ilent.nl/topics/port-state-control/mandatory-ship-notifications" target="_blank" rel="noopener">ILT mandatory ship notifications</a>, <a href="https://en.wikipedia.org/wiki/G%C3%BCls%C3%BCn-class_container_ship" target="_blank" rel="noopener">MSC Gülsün</a>, <a href="https://www.ect.nl/en/terminals/hutchison-ports-ect-delta" target="_blank" rel="noopener">Hutchison Ports ECT Delta</a>.</p>
+        <p>Code: MIT license.</p>
+      </details>
+    </div>
+  </aside>
+</div>
+
+<div id="json" hidden role="dialog" aria-modal="false" aria-labelledby="json-title">
+  <header>
+    <h3 id="json-title">Message</h3>
+    <div style="display:flex;gap:6px"><button class="btn" type="button" id="json-copy">Copy</button><button class="btn" type="button" id="json-close" aria-label="Close">Close</button></div>
+    <div class="sub" id="json-sub"></div>
+  </header>
+  <div class="meta" id="json-meta"></div>
+  <div class="req" id="json-req"></div>
+  <pre id="json-pre"></pre>
+</div>
+
+<script>
+/*APP*/
+</script>
+</body>
+</html>

@@ -1,0 +1,2169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DG declarations · ECT Delta</title>
+<meta name="author" content="Emilio Solanes">
+<meta name="description" content="Simulation of Dangerous Goods Declarations for six containers on MSC Gülsün at Hutchison Ports ECT Delta, Rotterdam, exchanged between shipper, forwarder, carrier, terminal and harbour master as DCSA DGD 1.0 draft messages.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: full-height ops floor. 3D stage left, live panels right, port call timeline under the stage. Phone: stage, timeline, panels stacked. */
+:root {
+  --bg: #E4EAEA;
+  --panel: #F5F8F8;
+  --panel-2: #E9EFEF;
+  --ink: #12232A;
+  --muted: #586B72;
+  --line: #C9D4D6;
+  --accent: #D9531E;
+  --e: #4B6FB5;
+  --r: #94559E;
+  --p: #B67C0B;
+  --a: #1D7F52;
+  --good: #1D7F52;
+  --warn: #B67C0B;
+  --crit: #C2362B;
+  --sky: #D6E1E4;
+  --sea: #A7BEC7;
+  --sea-deep: #94AEB9;
+  --land: #D4DAD5;
+  --pave: #C3CBCB;
+  --quay: #B2BCBD;
+  --crane: #E8ECEC;
+  --crane-acc: #46708A;
+  --g-naut: #6E8C9B;
+  --g-berth: #C3CFD2;
+  --g-cargo: #2F4A57;
+  --g-anch: #D8A23A;
+  --font-display: 'Big Shoulders Display', 'Arial Narrow', 'Roboto Condensed', sans-serif;
+  --font-body: 'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0B1317; --panel: #111C22; --panel-2: #172530; --ink: #DEE8EB; --muted: #8DA1A9; --line: #233540;
+    --accent: #FF7A48; --e: #7E9FE2; --r: #C88CD6; --p: #E3AE47; --a: #4CC189; --good: #4CC189; --warn: #E3AE47; --crit: #F2625A;
+    --sky: #0E1A20; --sea: #142A34; --sea-deep: #10232C; --land: #1F2D35; --pave: #283841; --quay: #31424B;
+    --crane: #A9B4B8; --crane-acc: #5D8BA6; --g-naut: #5F7F8F; --g-berth: #2B3D47; --g-cargo: #A9C3CE; --g-anch: #D8A23A;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0B1317; --panel: #111C22; --panel-2: #172530; --ink: #DEE8EB; --muted: #8DA1A9; --line: #233540;
+  --accent: #FF7A48; --e: #7E9FE2; --r: #C88CD6; --p: #E3AE47; --a: #4CC189; --good: #4CC189; --warn: #E3AE47; --crit: #F2625A;
+  --sky: #0E1A20; --sea: #142A34; --sea-deep: #10232C; --land: #1F2D35; --pave: #283841; --quay: #31424B;
+  --crane: #A9B4B8; --crane-acc: #5D8BA6; --g-naut: #5F7F8F; --g-berth: #2B3D47; --g-cargo: #A9C3CE; --g-anch: #D8A23A;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: 14px; line-height: 1.45;
+  padding-block: 12px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  -webkit-font-smoothing: antialiased;
+}
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+#app {
+  height: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 372px;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 12px;
+}
+#stage { grid-column: 1; grid-row: 1; position: relative; border-radius: 12px; overflow: hidden; background: var(--sky); min-height: 0; border: 1px solid var(--line); touch-action: none; }
+#gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+#credit { position: absolute; right: 10px; bottom: 8px; z-index: 2; pointer-events: none; font: 500 10.5px/1 var(--font-mono); letter-spacing: .04em; color: var(--muted); background: color-mix(in srgb, var(--panel) 72%, transparent); padding: 4px 7px; border-radius: 4px; }
+#side { grid-column: 2; grid-row: 1 / span 2; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; min-height: 0; padding-right: 2px; }
+#bottom { grid-column: 1; grid-row: 2; min-width: 0; }
+
+/* ---------- overlays on the stage */
+.hud {
+  position: absolute; z-index: 3;
+  background: color-mix(in srgb, var(--panel) 90%, transparent);
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  border: 1px solid var(--line); border-radius: 10px;
+}
+#brand { top: 12px; left: 12px; padding: 10px 12px 10px; max-width: calc(100% - 24px); }
+.eyebrow { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+#brand h1 { font-family: var(--font-display); font-weight: 700; font-size: 26px; line-height: 1; margin: 3px 0 6px; letter-spacing: .01em; text-wrap: balance; }
+#clock { display: flex; align-items: baseline; gap: 8px; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+#clock .d { font-size: 12px; color: var(--muted); }
+#clock .t { font-size: 20px; font-weight: 500; }
+.tag { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 11px; color: var(--muted); }
+.tag i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); display: inline-block; }
+
+#views { top: 12px; right: 12px; display: flex; padding: 3px; gap: 2px; }
+#views button { border: 0; background: transparent; padding: 6px 10px; border-radius: 7px; font-size: 12.5px; font-weight: 600; cursor: pointer; color: var(--muted); }
+#views button[aria-pressed="true"] { background: var(--ink); color: var(--panel); }
+#views button:hover:not([aria-pressed="true"]) { color: var(--ink); }
+
+#card { grid-column: 1; grid-row: 1; align-self: end; justify-self: start; position: relative; margin: 0 0 12px 12px; z-index: 4; width: 392px; max-height: calc(100% - 172px); display: flex; flex-direction: column; overflow: hidden; }
+#card[hidden] { display: none !important; }
+.card-head { padding: 12px 14px 10px; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: start; }
+.card-head h2 { font-family: var(--font-display); font-weight: 700; font-size: 24px; line-height: 1; margin: 2px 0 0; letter-spacing: .01em; }
+.card-head .sub { grid-column: 1 / -1; font-size: 12px; color: var(--muted); }
+.card-head .acts { display: flex; gap: 6px; }
+.btn { border: 1px solid var(--line); background: var(--panel); border-radius: 7px; padding: 4px 9px; font-size: 12px; font-weight: 600; cursor: pointer; }
+.btn:hover { border-color: var(--muted); }
+.btn[aria-pressed="true"] { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+.btn.icon { padding: 4px 8px; }
+.card-body { overflow-y: auto; padding: 10px 14px 12px; display: flex; flex-direction: column; gap: 10px; }
+.status-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; font-size: 13px; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; font-size: 12.5px; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; font-variant-numeric: tabular-nums; }
+.story { font-size: 12.5px; color: var(--muted); margin: 0; }
+
+/* ---------- labels in the scene */
+.lbl { position: absolute; left: 0; top: 0; white-space: nowrap; will-change: transform; }
+.lbl.vessel { pointer-events: auto; cursor: pointer; background: var(--panel); border: 1px solid var(--line); border-radius: 5px; padding: 2px 7px 3px; font-size: 11.5px; font-weight: 600; line-height: 1.25; box-shadow: 0 1px 2px rgb(0 0 0 / .08); }
+.lbl.vessel small { display: block; font-weight: 500; font-size: 10.5px; color: var(--muted); }
+.lbl.vessel.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.lbl.vessel::after { content: ""; position: absolute; left: 50%; bottom: -5px; width: 1px; height: 5px; background: var(--muted); }
+.lbl.place { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600; color: var(--muted); text-shadow: 0 0 3px var(--sky), 0 0 6px var(--sky); }
+.lbl.craft { font-size: 10.5px; font-weight: 600; color: var(--ink); text-shadow: 0 0 3px var(--sky), 0 0 6px var(--sky); }
+
+/* ---------- panels */
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.panel > header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.panel h3 { font-family: var(--font-display); font-weight: 700; font-size: 17px; letter-spacing: .05em; text-transform: uppercase; margin: 0; }
+.panel header .meta { font-size: 11.5px; color: var(--muted); }
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.stat .v { font-family: var(--font-display); font-weight: 700; font-size: 28px; line-height: 1; font-variant-numeric: tabular-nums; }
+.stat .v small { font-family: var(--font-body); font-size: 12px; font-weight: 500; color: var(--muted); margin-left: 2px; }
+.stat .k { font-size: 11.5px; color: var(--muted); }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+.pill { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 1px 8px 2px; font-size: 11.5px; font-weight: 600; border: 1px solid var(--line); background: var(--panel-2); white-space: nowrap; }
+.pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--muted); }
+.pill.naut::before { background: var(--g-naut); }
+.pill.cargo::before { background: var(--a); }
+.pill.anch::before { background: var(--g-anch); }
+.pill.stop { border-color: var(--crit); color: var(--crit); }
+.pill.stop::before { background: var(--crit); }
+.pill.done { color: var(--muted); }
+
+/* vessels list */
+.vlist { display: flex; flex-direction: column; }
+.vrow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; padding: 8px 6px; margin: 0 -6px; border-radius: 7px; cursor: pointer; border: 0; background: transparent; text-align: left; width: calc(100% + 12px); }
+.vrow + .vrow { border-top: 1px solid var(--line); border-radius: 0; }
+.vrow:hover { background: var(--panel-2); }
+.vrow.sel { background: var(--panel-2); box-shadow: inset 3px 0 0 var(--accent); }
+.vrow .n { font-weight: 600; font-size: 13.5px; }
+.vrow .s { font-size: 11.5px; color: var(--muted); grid-column: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrow .pill { justify-self: end; }
+.vrow .nx { grid-column: 2; justify-self: end; font-size: 11.5px; color: var(--muted); }
+.bar { height: 4px; border-radius: 2px; background: var(--panel-2); overflow: hidden; grid-column: 1 / -1; margin-top: 4px; }
+.bar > i { display: block; height: 100%; background: var(--a); }
+
+/* quay strip */
+.quay { position: relative; height: 54px; margin: 10px 0 4px; }
+.quay .wall { position: absolute; left: 0; right: 0; top: 30px; height: 2px; background: var(--muted); opacity: .5; }
+.quay .zone { position: absolute; top: 34px; font-size: 10px; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; overflow: hidden; }
+.quay .ship { position: absolute; top: 14px; height: 14px; border-radius: 3px 7px 7px 3px; background: var(--g-cargo); opacity: .85; }
+.quay .ship.feeder { background: var(--g-naut); }
+.quay .cr { position: absolute; top: 4px; width: 3px; height: 26px; border-radius: 1px; background: var(--muted); opacity: .45; transform: translateX(-1px); }
+.quay .cr.work { background: var(--a); opacity: 1; }
+.quay .cr.stop { background: var(--crit); opacity: 1; }
+.quay .cr.comm { background: repeating-linear-gradient(var(--muted) 0 3px, transparent 3px 6px); opacity: .6; }
+.spark { display: flex; align-items: flex-end; gap: 2px; height: 34px; margin-top: 6px; }
+.spark i { flex: 1; background: var(--g-naut); border-radius: 1px; min-height: 1px; opacity: .55; }
+.spark i.now { background: var(--accent); opacity: 1; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 5px; }
+.legend i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+
+/* nautical */
+.cells { display: flex; gap: 4px; }
+.cells i { flex: 1; height: 10px; border-radius: 2px; background: var(--panel-2); border: 1px solid var(--line); }
+.cells i.busy { background: var(--g-naut); border-color: var(--g-naut); }
+.cells i.tow { background: var(--ink); border-color: var(--ink); }
+.rows { display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; }
+.rows > div { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 8px; align-items: center; }
+.rows .k { color: var(--muted); }
+
+/* ERPA */
+.cls { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 3px; border-radius: 4px; font: 600 11px/1 var(--font-mono); color: var(--panel); background: var(--muted); }
+.cls.EST { background: var(--e); } .cls.REQ { background: var(--r); } .cls.PLN { background: var(--p); } .cls.ACT { background: var(--a); }
+.erpa-bar { display: flex; height: 8px; border-radius: 3px; overflow: hidden; margin: 6px 0 4px; background: var(--panel-2); }
+.erpa-bar i { display: block; height: 100%; }
+.outcomes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.outcome { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+.outcome .v { font-family: var(--font-display); font-weight: 700; font-size: 24px; line-height: 1.05; }
+.outcome .k { font-size: 11.5px; color: var(--muted); }
+.outcome.good { box-shadow: inset 0 3px 0 var(--good); }
+.outcome.warn { box-shadow: inset 0 3px 0 var(--warn); }
+
+table.erpa { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; }
+table.erpa th { font-weight: 600; font-size: 11px; text-align: left; color: var(--muted); padding: 4px 4px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--panel); }
+table.erpa th.c { text-align: center; width: 52px; }
+table.erpa td { padding: 4px 4px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+table.erpa td.c { text-align: center; font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 11.5px; white-space: nowrap; }
+table.erpa td.c.na { color: var(--line); }
+table.erpa td.c b { font-weight: 500; }
+table.erpa td.c .dy { display: block; font-size: 9.5px; line-height: 1; color: var(--muted); font-family: var(--font-body); }
+table.erpa td.c sup { font-size: 9px; color: var(--muted); margin-left: 1px; }
+table.erpa td.c.EST b { color: var(--e); } table.erpa td.c.REQ b { color: var(--r); } table.erpa td.c.PLN b { color: var(--p); } table.erpa td.c.ACT b { color: var(--a); font-weight: 600; }
+table.erpa td.c.fresh { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+table.erpa tr.row { cursor: pointer; }
+table.erpa tr.row:hover td { background: var(--panel-2); }
+table.erpa tr.row.open td { background: var(--panel-2); }
+table.erpa td.svc { font-size: 12px; line-height: 1.25; }
+table.erpa td.svc .code { display: block; overflow-wrap: anywhere; font-family: var(--font-mono); font-size: 10px; color: var(--muted); letter-spacing: .02em; }
+table.erpa tr.future td { color: var(--muted); }
+table.erpa tr.hist td { padding: 0 4px 8px; background: var(--panel-2); }
+.hist-list { display: flex; flex-direction: column; gap: 2px; font-size: 11.5px; }
+.hist-list button { display: grid; grid-template-columns: 22px 92px 1fr; gap: 6px; align-items: center; text-align: left; border: 0; background: transparent; padding: 3px 2px; border-radius: 4px; cursor: pointer; }
+.hist-list button:hover { background: var(--panel); }
+.hist-list .who { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* feed */
+.feed { display: flex; flex-direction: column; max-height: 360px; overflow-y: auto; margin: 0 -6px; }
+.feed button { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 2px 8px; align-items: center; padding: 6px; border: 0; background: transparent; text-align: left; cursor: pointer; border-radius: 6px; }
+.feed button:hover { background: var(--panel-2); }
+.feed button.new { background: color-mix(in srgb, var(--accent) 9%, transparent); }
+.feed .c1 { font-size: 12.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.feed .c1 span { font-family: var(--font-mono); font-weight: 500; font-size: 11.5px; letter-spacing: .01em; }
+.feed .c2 { grid-column: 2 / 4; font-size: 11.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.feed .val { font-family: var(--font-mono); font-size: 12px; font-variant-numeric: tabular-nums; }
+
+/* alerts */
+.alerts { display: flex; flex-direction: column; gap: 6px; }
+.alert { border-left: 3px solid var(--muted); padding: 4px 0 4px 10px; font-size: 12.5px; }
+.alert.crit { border-color: var(--crit); } .alert.warn { border-color: var(--warn); } .alert.good { border-color: var(--good); }
+.alert .h { display: flex; justify-content: space-between; gap: 8px; font-weight: 600; }
+.alert .h span { font-family: var(--font-mono); font-weight: 400; font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+.alert p { margin: 1px 0 0; color: var(--muted); font-size: 12px; }
+.alert.active .h::after { content: "Active"; font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--crit); margin-left: auto; }
+
+details.about summary { cursor: pointer; font-family: var(--font-display); font-weight: 700; font-size: 17px; letter-spacing: .05em; text-transform: uppercase; list-style: none; display: flex; justify-content: space-between; }
+details.about summary::-webkit-details-marker { display: none; }
+details.about summary::after { content: "+"; font-family: var(--font-mono); color: var(--muted); }
+details.about[open] summary::after { content: "–"; }
+details.about p, details.about li { font-size: 12.5px; color: var(--muted); }
+details.about ul { padding-left: 18px; margin: 6px 0; }
+details.about a { color: var(--ink); }
+
+/* ---------- timeline */
+#bottom .panel { padding: 10px 12px 10px; }
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-bottom: 8px; }
+#play { width: 34px; height: 30px; border-radius: 8px; border: 0; background: var(--ink); color: var(--panel); cursor: pointer; display: grid; place-items: center; }
+#play svg { width: 14px; height: 14px; fill: currentColor; }
+.speed { display: flex; border: 1px solid var(--line); border-radius: 8px; padding: 2px; }
+.speed button { border: 0; background: transparent; padding: 3px 8px; font-size: 12px; font-weight: 600; border-radius: 6px; cursor: pointer; color: var(--muted); font-variant-numeric: tabular-nums; }
+.speed button[aria-pressed="true"] { background: var(--panel-2); color: var(--ink); }
+.moments { display: flex; gap: 6px; overflow-x: auto; flex: 1 1 260px; min-width: 0; scrollbar-width: thin; padding-bottom: 2px; }
+.moments button { flex: none; border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 3px 10px; font-size: 12px; cursor: pointer; white-space: nowrap; }
+.moments button:hover { border-color: var(--muted); }
+.moments button span { font-family: var(--font-mono); color: var(--muted); margin-right: 5px; font-size: 11px; }
+
+.gantt { position: relative; user-select: none; -webkit-user-select: none; }
+.g-axis, .g-row { display: grid; grid-template-columns: 116px minmax(0, 1fr); align-items: center; }
+.g-axis { height: 16px; font-size: 10.5px; color: var(--muted); font-family: var(--font-mono); }
+.g-axis .ticks { position: relative; height: 100%; }
+.g-axis .ticks span { position: absolute; transform: translateX(-50%); top: 0; white-space: nowrap; }
+.g-axis .ticks span:first-child { transform: none; }
+.g-row { height: 21px; }
+.g-name { font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 8px; cursor: pointer; border: 0; background: transparent; text-align: left; }
+.g-name.sel { color: var(--accent); }
+.g-track { position: relative; height: 13px; background: var(--panel-2); border-radius: 3px; cursor: pointer; }
+.seg { position: absolute; top: 0; bottom: 0; border-radius: 2px; }
+.seg.sea { background: repeating-linear-gradient(90deg, var(--g-naut) 0 2px, transparent 2px 5px); opacity: .45; }
+.seg.naut { background: var(--g-naut); }
+.seg.anch { background: repeating-linear-gradient(135deg, var(--g-anch) 0 3px, color-mix(in srgb, var(--g-anch) 40%, transparent) 3px 6px); }
+.seg.berth { background: var(--g-berth); }
+.seg.cargo { background: var(--g-cargo); top: 3px; bottom: 3px; }
+.seg.stop { background: var(--crit); top: 1px; bottom: 1px; }
+.mark { position: absolute; top: -2px; width: 9px; height: 9px; transform: translateX(-50%) rotate(45deg); border: 1.5px solid var(--p); background: var(--panel); z-index: 2; }
+.mark.etau { border-color: var(--e); border-style: dashed; background: transparent; }
+.g-ph { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--accent); transform: translateX(-1px); pointer-events: none; z-index: 3; }
+.g-ph::before { content: ""; position: absolute; top: -3px; left: -4px; width: 10px; height: 6px; background: var(--accent); border-radius: 2px; }
+.g-area { position: absolute; top: 0; bottom: 0; right: 0; pointer-events: none; }
+.g-dis { position: absolute; top: 16px; bottom: 0; background: color-mix(in srgb, var(--crit) 10%, transparent); pointer-events: none; }
+
+/* ---------- JSON drawer */
+#json { position: fixed; z-index: 20; right: max(16px, env(safe-area-inset-right, 0px)); top: calc(16px + env(safe-area-inset-top, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); width: min(520px, calc(100% - 32px)); display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 40px rgb(0 0 0 / .25); }
+#json header { padding: 12px 14px; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; }
+#json header h3 { margin: 0; font-family: var(--font-display); font-size: 22px; line-height: 1; letter-spacing: .02em; }
+#json header .sub { grid-column: 1 / -1; font-size: 12px; color: var(--muted); }
+#json .req { font-family: var(--font-mono); font-size: 11.5px; padding: 8px 14px; border-bottom: 1px solid var(--line); color: var(--muted); white-space: pre-wrap; word-break: break-word; }
+#json pre { margin: 0; padding: 12px 14px; overflow: auto; font-family: var(--font-mono); font-size: 11.5px; line-height: 1.5; flex: 1; min-height: 0; }
+#json pre .k { color: var(--e); } #json pre .s { color: var(--a); } #json pre .n { color: var(--p); } #json pre .b { color: var(--r); }
+
+/* ---------- phone */
+@media (max-width: 899px) {
+  html, body { height: auto; }
+  #app { display: flex; flex-direction: column; height: auto; }
+  #stage { height: 60vh; min-height: 360px; max-height: 640px; }
+  #side { overflow: visible; padding-right: 0; }
+  #brand h1 { font-size: 21px; }
+  #brand .tag { display: none; }
+  #clock .t { font-size: 17px; }
+  #views { top: auto; bottom: 12px; right: 12px; }
+  #credit { top: 12px; right: 12px; bottom: auto; }
+  #card { margin: 0; width: auto; max-height: none; align-self: auto; justify-self: auto; }
+  #card .card-body { max-height: 440px; }
+  .g-axis .ticks span.minor { display: none; }
+  .g-axis, .g-row { grid-template-columns: 88px minmax(0, 1fr); }
+  .g-name { font-size: 11px; }
+}
+@media (max-width: 420px) {
+  #brand .eyebrow { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { scroll-behavior: auto !important; }
+}
+
+/* port switch: Rotterdam and the next port */
+#ports { display: flex; gap: 2px; padding: 3px; margin: 2px 0 8px; border-radius: 9px; background: var(--panel-2); width: max-content; max-width: 100%; }
+#ports button { position: relative; border: 0; background: transparent; padding: 5px 14px 6px 10px; border-radius: 7px; font-size: 12.5px; font-weight: 600; cursor: pointer; color: var(--muted); text-align: left; line-height: 1.15; }
+#ports button small { display: block; font-size: 10.5px; font-weight: 500; opacity: .8; }
+#ports button[aria-pressed="true"] { background: var(--ink); color: var(--panel); }
+#ports button:hover:not([aria-pressed="true"]) { color: var(--ink); }
+#ports button.news::after { content: ""; position: absolute; top: 4px; right: 3px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px var(--panel-2); }
+.outcome.info { box-shadow: inset 0 3px 0 var(--g-naut); }
+.outcome.wide { grid-column: 1 / -1; }
+.g-port { font: 600 9.5px/1 var(--font-mono); letter-spacing: .04em; color: var(--panel); background: var(--g-naut); border-radius: 3px; padding: 2px 3px; margin-right: 5px; vertical-align: 1px; }
+.moments button.next { border-color: color-mix(in srgb, var(--g-naut) 60%, var(--line)); }
+.feed .tagp { font-style: normal; font: 600 9.5px/1 var(--font-mono); color: var(--muted); border: 1px solid var(--line); border-radius: 3px; padding: 1px 3px; margin-left: 4px; }
+.lbl.vessel.ghost { opacity: .85; border-style: dashed; }
+@media (max-width: 600px) { #ports button small { display: none; } #ports { margin-bottom: 6px; } }
+
+/* ---------- DGD additions on top of the port call design system */
+#stage { background-color: var(--sky); background-image: radial-gradient(color-mix(in srgb, var(--muted) 22%, transparent) 1px, transparent 1.2px); background-size: 22px 22px; }
+#wires { position: absolute; inset: 0; width: 100%; height: 100%; display: block; overflow: visible; }
+#desks { position: absolute; inset: 0; pointer-events: none; }
+
+/* lens switch reuses the port switch */
+#lens { display: flex; gap: 2px; padding: 3px; margin: 2px 0 8px; border-radius: 9px; background: var(--panel-2); width: max-content; max-width: 100%; }
+#lens button { position: relative; border: 0; background: transparent; padding: 5px 11px 6px 9px; border-radius: 7px; font-size: 12.5px; font-weight: 600; cursor: pointer; color: var(--muted); text-align: left; line-height: 1.15; }
+#lens button small { display: block; font-size: 10.5px; font-weight: 500; opacity: .8; }
+#lens button[aria-pressed="true"] { background: var(--ink); color: var(--panel); }
+#lens button:hover:not([aria-pressed="true"]) { color: var(--ink); }
+#lens button.news::after { content: ""; position: absolute; top: 4px; right: 3px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px var(--panel-2); }
+
+/* message kinds: Requested, Declared, Feedback, Accepted */
+.cls.R { background: var(--r); } .cls.D { background: var(--e); } .cls.F { background: var(--p); } .cls.A { background: var(--a); }
+.cls.F.err { background: var(--crit); }
+table.erpa td.c.R b { color: var(--r); } table.erpa td.c.D b { color: var(--e); } table.erpa td.c.F b { color: var(--p); } table.erpa td.c.A b { color: var(--a); font-weight: 600; }
+table.erpa td.c.F.err b { color: var(--crit); font-weight: 600; }
+table.erpa td.c.behind { box-shadow: inset 0 0 0 1px var(--accent); }
+table.erpa td.c .bh { display: block; font: 600 9px/1.1 var(--font-body); color: var(--accent); letter-spacing: .02em; }
+table.erpa td.svc .who { display: block; font-size: 10.5px; color: var(--muted); }
+table.erpa tr.lens td.svc { box-shadow: inset 3px 0 0 var(--accent); }
+
+/* class badge: small single-colour diamond */
+.dg { display: inline-grid; place-items: center; width: 15px; height: 15px; margin: 0 3px; vertical-align: -3px; position: relative; font: 700 9px/1 var(--font-mono); font-style: normal; color: var(--ink); }
+.dg::before { content: ""; position: absolute; inset: 2px; border: 1.5px solid currentColor; transform: rotate(45deg); border-radius: 1px; }
+.dg.sub { opacity: .8; }
+.dg.sub::before { border-style: dashed; }
+
+.pill.req::before { background: var(--r); }
+.pill.dec::before { background: var(--e); }
+.pill.acc::before { background: var(--a); }
+.pill.warn::before { background: var(--warn); }
+
+/* ---------- party desks (chain view) */
+.desk { position: absolute; pointer-events: auto; cursor: pointer; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px 9px; box-shadow: 0 1px 3px rgb(0 0 0 / .06); transition: opacity .25s, box-shadow .25s, border-color .25s; }
+.desk:hover { border-color: var(--muted); }
+.desk .eyebrow { font-size: 9.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.desk .dn { font-weight: 600; font-size: 13px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 5px; }
+.desk .dcopy { display: flex; align-items: baseline; gap: 6px; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.desk .dcopy b { font-size: 22px; font-weight: 600; color: var(--e); line-height: 1; }
+.desk .dcopy b sup { font-size: 10px; color: var(--muted); font-weight: 500; margin-left: 1px; }
+.desk .dcopy span { font-size: 10.5px; font-weight: 600; letter-spacing: .04em; color: var(--muted); }
+.desk .dcopy.none b { color: var(--line); }
+.desk .dun { font-family: var(--font-mono); font-size: 11.5px; margin-top: 4px; white-space: nowrap; }
+.desk .dfb { font-size: 10.5px; margin-top: 5px; padding-top: 5px; border-top: 1px solid var(--line); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 5px; min-height: 22px; }
+.desk .dfb .cls { min-width: 15px; height: 15px; font-size: 9.5px; }
+.desk.dim { opacity: .42; }
+.desk.lens { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.desk.err { border-color: var(--crit); box-shadow: 0 0 0 1px var(--crit); }
+.desk.behind .dcopy b { text-decoration: underline wavy color-mix(in srgb, var(--accent) 70%, transparent) 1px; text-underline-offset: 4px; }
+.desk.fresh { background: color-mix(in srgb, var(--accent) 9%, var(--panel)); }
+.desk.compact { padding: 6px 5px 7px; }
+.desk.compact .eyebrow, .desk.compact .dun { display: none; }
+.desk.compact .dn { font-size: 10.5px; margin-bottom: 3px; letter-spacing: -.01em; text-overflow: clip; }
+.desk.compact .dcopy b { font-size: 17px; }
+.desk.compact .dcopy span { display: none; }
+.desk.compact .dfb { font-size: 10px; padding-top: 3px; margin-top: 3px; }
+.desk.compact .dfb .t { display: none; }
+
+/* wires and tokens */
+.arc { fill: none; stroke: var(--line); stroke-width: 1.25; }
+.arc.used { stroke: color-mix(in srgb, var(--muted) 55%, transparent); stroke-dasharray: 2 4; }
+.tok rect { rx: 4px; }
+.tok text.l { font: 600 10.5px/1 var(--font-mono); fill: var(--panel); text-anchor: middle; dominant-baseline: central; }
+.tok text.c { font: 500 10.5px/1 var(--font-mono); fill: var(--ink); paint-order: stroke; stroke: var(--sky); stroke-width: 4px; stroke-linejoin: round; }
+.tok.R rect { fill: var(--r); } .tok.D rect { fill: var(--e); } .tok.F rect { fill: var(--p); } .tok.A rect { fill: var(--a); } .tok.F.err rect { fill: var(--crit); }
+.tok.bg { opacity: .45; }
+.probe { fill: none; stroke: var(--muted); stroke-width: 1.4; stroke-dasharray: 3 3; }
+.probe-dot { fill: var(--sky); stroke: var(--muted); stroke-width: 1.4; }
+.probe-t { font: 500 9.5px/1 var(--font-mono); fill: var(--muted); paint-order: stroke; stroke: var(--sky); stroke-width: 3px; }
+
+/* physical lane */
+.lane { stroke: var(--muted); stroke-width: 2; opacity: .45; }
+.lane-road { stroke: var(--muted); stroke-width: 6; opacity: .14; stroke-linecap: round; }
+.st-l { font: 600 9.5px/1 var(--font-body); letter-spacing: .1em; text-transform: uppercase; fill: var(--muted); text-anchor: middle; paint-order: stroke; stroke: var(--sky); stroke-width: 4px; }
+.st-tick { stroke: var(--muted); stroke-width: 1.5; opacity: .55; }
+.gate-arch { fill: none; stroke: var(--crane-acc); stroke-width: 3; stroke-linejoin: round; }
+.gate-cam { fill: var(--crane-acc); }
+.scan { fill: color-mix(in srgb, var(--accent) 22%, transparent); }
+.cbox rect.b { fill: var(--g-naut); stroke: var(--panel); stroke-width: 1; }
+.cbox.hero rect.b { fill: var(--g-cargo); }
+.cbox.sel rect.b { stroke: var(--accent); stroke-width: 2; }
+.cbox .pl { fill: var(--panel); stroke: var(--ink); stroke-width: 1; }
+.cbox .plt { font: 700 7.5px/1 var(--font-mono); fill: var(--ink); text-anchor: middle; dominant-baseline: central; }
+.cbox text.n { font: 600 10.5px/1 var(--font-body); fill: var(--ink); text-anchor: middle; paint-order: stroke; stroke: var(--sky); stroke-width: 4px; stroke-linejoin: round; }
+.cbox text.s { font: 500 9.5px/1 var(--font-body); fill: var(--muted); text-anchor: middle; paint-order: stroke; stroke: var(--sky); stroke-width: 4px; stroke-linejoin: round; }
+.cbox text.s.crit { fill: var(--crit); font-weight: 700; }
+.ring { fill: none; stroke: var(--crit); stroke-width: 2; }
+.ring.acc { stroke: var(--accent); }
+.ship path.h { fill: var(--g-cargo); }
+.ship rect.c { stroke: var(--panel); stroke-width: .6; }
+.ship text { font: 600 10.5px/1 var(--font-body); fill: var(--ink); text-anchor: middle; paint-order: stroke; stroke: var(--sky); stroke-width: 4px; stroke-linejoin: round; }
+.ship text.s { font-weight: 500; font-size: 9.5px; fill: var(--muted); }
+.tie { stroke: var(--crit); stroke-width: 1.2; stroke-dasharray: 3 3; fill: none; }
+
+/* ---------- document view */
+.view-pane { position: absolute; z-index: 2; display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 2px 10px rgb(0 0 0 / .06); overflow: hidden; }
+.view-pane > header { padding: 10px 14px 9px; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: end; }
+.view-pane > header h2 { font-family: var(--font-display); font-weight: 700; font-size: 22px; line-height: 1; margin: 2px 0 0; letter-spacing: .01em; }
+.view-pane > header .sub { grid-column: 1 / -1; font-size: 12px; color: var(--muted); }
+.revrail { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.revrail span { font: 500 11px/1 var(--font-mono); border: 1px solid var(--line); border-radius: 999px; padding: 4px 8px; color: var(--muted); background: var(--panel-2); white-space: nowrap; }
+.revrail span.on { border-color: var(--e); color: var(--ink); background: color-mix(in srgb, var(--e) 12%, var(--panel)); }
+.revrail span b { color: var(--e); font-weight: 600; }
+.revrail span i { font-style: normal; color: var(--muted); }
+.doc-body { position: relative; overflow: auto; flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 236px; gap: 0 18px; padding: 8px 14px 14px; }
+.doc-body.nofb { grid-template-columns: minmax(0, 1fr); }
+.doc-sec { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 600; margin: 10px 0 3px; }
+.doc-row { display: grid; grid-template-columns: minmax(170px, 54%) minmax(0, 1fr); gap: 10px; padding: 3px 6px; margin: 0 -6px; border-radius: 5px; font-size: 12.5px; align-items: baseline; }
+.doc-row .k { font-family: var(--font-mono); font-size: 10.5px; color: var(--muted); overflow-wrap: anywhere; }
+.doc-row .v { font-family: var(--font-mono); font-size: 12px; overflow-wrap: anywhere; }
+.doc-row .v s { color: var(--muted); margin-right: 6px; font-size: 11px; }
+.doc-row .v.absent { color: var(--muted); font-style: italic; font-family: var(--font-body); }
+.doc-row.chg { background: color-mix(in srgb, var(--accent) 13%, transparent); }
+.doc-row.ptr { box-shadow: inset 0 0 0 1.5px var(--crit); background: color-mix(in srgb, var(--crit) 8%, transparent); }
+.doc-row.ptr.warn { box-shadow: inset 0 0 0 1.5px var(--warn); background: color-mix(in srgb, var(--warn) 9%, transparent); }
+.doc-fb { display: flex; flex-direction: column; gap: 8px; padding-top: 10px; }
+.fbn { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 12px; background: var(--panel); position: relative; z-index: 1; }
+.fbn.err { box-shadow: inset 0 3px 0 var(--crit); }
+.fbn.warn { box-shadow: inset 0 3px 0 var(--warn); }
+.fbn.ok { box-shadow: inset 0 3px 0 var(--good); }
+.fbn .h { display: flex; justify-content: space-between; gap: 8px; font-weight: 600; }
+.fbn .h span { font-family: var(--font-mono); font-weight: 400; font-size: 11px; color: var(--muted); }
+.fbn .code { font: 500 10.5px/1.3 var(--font-mono); color: var(--muted); margin: 2px 0 4px; overflow-wrap: anywhere; }
+.fbn p { margin: 0; color: var(--muted); font-size: 11.5px; }
+.fbn .path { margin-top: 5px; font: 600 10.5px/1.3 var(--font-mono); color: var(--crit); overflow-wrap: anywhere; }
+.fbn.warn .path { color: var(--warn); }
+.fbn.relay::after { content: "relayed"; position: absolute; top: 8px; right: 52px; font: 600 9px/1 var(--font-mono); letter-spacing: .04em; color: var(--muted); border: 1px solid var(--line); border-radius: 3px; padding: 1px 3px; }
+.doc-ptr { position: absolute; inset: 0; pointer-events: none; overflow: visible; width: 100%; height: 100%; }
+.doc-ptr path { fill: none; stroke: var(--crit); stroke-width: 1.5; }
+.doc-ptr path.warn { stroke: var(--warn); }
+.doc-ptr circle { fill: var(--crit); } .doc-ptr circle.warn { fill: var(--warn); }
+.doc-empty { padding: 30px 14px; color: var(--muted); font-size: 13px; }
+
+/* ---------- box view */
+.box-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 250px; overflow: auto; }
+.box-svg { width: 100%; height: 100%; min-height: 260px; display: block; }
+.box-side { border-left: 1px solid var(--line); padding: 10px 12px; display: flex; flex-direction: column; gap: 10px; font-size: 12px; overflow: auto; }
+.cmp { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.cmp > div { border: 1px solid var(--line); border-radius: 8px; padding: 7px 8px; }
+.cmp .k { font-size: 10.5px; color: var(--muted); line-height: 1.25; }
+.cmp .v { font-family: var(--font-display); font-weight: 700; font-size: 22px; line-height: 1.1; margin-top: 3px; display: flex; align-items: center; gap: 2px; }
+.cmp .v .dg { width: 22px; height: 22px; font-size: 11px; margin: 0 4px 0 0; }
+.cmp.bad > div:last-child { border-color: var(--crit); box-shadow: inset 0 3px 0 var(--crit); }
+.cmp.good > div:last-child { box-shadow: inset 0 3px 0 var(--good); }
+.verdict { font-size: 12px; font-weight: 600; }
+.verdict.bad { color: var(--crit); } .verdict.good { color: var(--good); }
+.maplist { display: flex; flex-direction: column; gap: 2px; }
+.maplist button { border: 0; background: transparent; text-align: left; padding: 5px 6px; margin: 0 -6px; border-radius: 6px; cursor: pointer; display: grid; gap: 1px; }
+.maplist button:hover { background: var(--panel-2); }
+.maplist .p { font: 500 10.5px/1.25 var(--font-mono); color: var(--e); overflow-wrap: anywhere; }
+.maplist .d { font-size: 12px; }
+.iso-wall { stroke: var(--muted); stroke-width: 1; stroke-linejoin: round; }
+.iso-far { fill: color-mix(in srgb, var(--g-naut) 30%, var(--panel)); }
+.iso-floor { fill: color-mix(in srgb, var(--g-naut) 18%, var(--panel)); }
+.iso-near { fill: color-mix(in srgb, var(--g-cargo) 22%, transparent); }
+.iso-end { fill: color-mix(in srgb, var(--g-cargo) 55%, var(--panel)); }
+.iso-rib { stroke: var(--g-cargo); stroke-width: .8; opacity: .35; }
+.iso-edge { fill: none; stroke: var(--g-cargo); stroke-width: 1.4; stroke-linejoin: round; }
+.drum-b { fill: color-mix(in srgb, var(--e) 55%, var(--g-cargo)); }
+.drum-t { fill: color-mix(in srgb, var(--e) 35%, var(--panel)); stroke: color-mix(in srgb, var(--e) 60%, var(--g-cargo)); stroke-width: .6; }
+.crate-t { fill: color-mix(in srgb, var(--p) 30%, var(--panel)); stroke: var(--g-cargo); stroke-width: .5; }
+.crate-l { fill: color-mix(in srgb, var(--p) 45%, var(--g-cargo)); stroke: var(--g-cargo); stroke-width: .5; }
+.crate-r { fill: color-mix(in srgb, var(--p) 60%, var(--g-cargo)); stroke: var(--g-cargo); stroke-width: .5; }
+.iso-pl { fill: var(--panel); stroke: var(--ink); stroke-width: .05; }
+.iso-plt { font: 700 .32px/1 var(--font-mono); fill: var(--ink); text-anchor: middle; dominant-baseline: central; }
+.iso-sign { fill: var(--panel); stroke: var(--ink); stroke-width: .03; }
+.iso-signt { font: 700 .16px/1 var(--font-body); fill: var(--crit); text-anchor: middle; }
+.box-tag { font: 600 11px/1 var(--font-mono); fill: var(--ink); paint-order: stroke; stroke: var(--panel); stroke-width: 4px; stroke-linejoin: round; }
+.box-held { font: 700 12px/1 var(--font-body); letter-spacing: .08em; fill: var(--crit); text-anchor: middle; paint-order: stroke; stroke: var(--panel); stroke-width: 4px; }
+
+/* ---------- gantt: revision staircase */
+.seg.r1 { background: color-mix(in srgb, var(--e) 32%, var(--panel)); }
+.seg.r2 { background: color-mix(in srgb, var(--e) 62%, var(--panel)); }
+.seg.r3 { background: var(--e); }
+.seg.r4 { background: color-mix(in srgb, var(--e) 80%, var(--ink)); }
+.seg.wd { background: repeating-linear-gradient(135deg, var(--muted) 0 2px, transparent 2px 5px); opacity: .55; }
+.seg .rl { position: absolute; left: 4px; top: 50%; transform: translateY(-50%); font: 600 9.5px/1 var(--font-mono); color: var(--panel); white-space: nowrap; }
+.seg.r1 .rl { color: var(--ink); }
+.seg.err { top: auto; bottom: -2px; height: 3px; background: var(--crit); border-radius: 1px; }
+.seg.plant { background: repeating-linear-gradient(90deg, var(--g-naut) 0 2px, transparent 2px 5px); opacity: .45; }
+.seg.road { background: var(--g-naut); }
+.seg.held { background: var(--crit); top: 1px; bottom: 1px; }
+.seg.yard { background: var(--g-berth); }
+.seg.aboard { background: var(--g-cargo); top: 3px; bottom: 3px; }
+.seg.exp { background: repeating-linear-gradient(90deg, var(--g-naut) 0 2px, transparent 2px 5px); opacity: .45; }
+.seg.along { background: var(--g-berth); }
+.seg.ops { background: var(--g-cargo); top: 3px; bottom: 3px; }
+.seg.plan { border: 1px dashed var(--muted); background: transparent; opacity: .6; }
+.tick { position: absolute; top: 1px; bottom: 1px; width: 3px; border-radius: 1px; transform: translateX(-1px); z-index: 2; }
+.tick.R { background: var(--r); } .tick.F { background: var(--p); } .tick.F.err { background: var(--crit); } .tick.A { background: var(--a); }
+.mark.cut { border-color: var(--p); }
+.mark.etd { border-color: var(--g-cargo); }
+.g-name small { font-weight: 500; color: var(--muted); font-size: 10.5px; margin-left: 4px; }
+
+/* ---------- parties panel */
+.plist { display: flex; flex-direction: column; }
+.prow { padding: 7px 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1px 8px; font-size: 12px; }
+.prow + .prow { border-top: 1px solid var(--line); }
+.prow .n { font-weight: 600; font-size: 13px; }
+.prow .r { justify-self: end; font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; align-self: center; }
+.prow .m { grid-column: 1 / -1; color: var(--muted); }
+.prow .m .mono { color: var(--ink); font-size: 11px; }
+.prow .c { grid-column: 1 / -1; display: flex; gap: 10px; font-size: 11.5px; color: var(--muted); }
+.prow .c b { font-family: var(--font-mono); font-weight: 500; color: var(--ink); }
+.prow.lens { box-shadow: inset 3px 0 0 var(--accent); padding-left: 8px; }
+
+.revs { display: flex; flex-direction: column; gap: 3px; font-size: 12px; }
+.revs div { display: grid; grid-template-columns: 26px 64px minmax(0, 1fr); gap: 6px; align-items: baseline; }
+.revs div.future { color: var(--muted); opacity: .5; }
+.revs b { font-family: var(--font-mono); color: var(--e); }
+.revs .tm { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+.card-sec { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 600; margin-bottom: -4px; }
+
+#json .meta { font-size: 12px; color: var(--muted); padding: 8px 14px 0; }
+#json .meta b { color: var(--ink); font-weight: 600; }
+
+@media (max-width: 899px) {
+  #credit { top: auto; bottom: 12px; left: 12px; right: auto; }
+  #lens button { padding: 5px 8px 6px 7px; font-size: 12px; }
+  #lens button small { display: none; }
+  .doc-body { grid-template-columns: minmax(0, 1fr); }
+  .doc-body .doc-fb { order: -1; }
+  .doc-ptr { display: none; }
+  .box-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(220px, 1fr) auto; }
+  .box-side { border-left: 0; border-top: 1px solid var(--line); }
+  .doc-row { grid-template-columns: minmax(0, 1fr); gap: 0; }
+}
+
+/* ---------- masked desks in a party view */
+.desk.masked { opacity: .5; cursor: default; background: repeating-linear-gradient(135deg, var(--panel) 0 6px, var(--panel-2) 6px 12px); }
+.desk.masked .dcopy b { color: var(--muted); }
+
+/* ---------- guided tour */
+.guide { position: absolute; z-index: 6; bottom: 14px; background: color-mix(in srgb, var(--ink) 93%, transparent); color: var(--panel); border-radius: 10px; padding: 10px 14px 10px; box-shadow: 0 10px 30px rgb(0 0 0 / .22); }
+.guide p { margin: 4px 0 8px; font-size: 14px; line-height: 1.45; text-wrap: pretty; }
+.guide p b { color: color-mix(in srgb, var(--accent) 70%, var(--panel)); font-weight: 600; }
+.guide p .mono { font-size: 12.5px; }
+.guide .g-top { display: flex; justify-content: space-between; align-items: baseline; }
+.guide .g-n { font: 600 10.5px/1 var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+.guide .g-skip { border: 0; background: transparent; color: color-mix(in srgb, var(--panel) 70%, transparent); font-size: 12px; cursor: pointer; padding: 2px 0; }
+.guide .g-skip:hover { color: var(--panel); }
+.guide .g-acts { display: flex; justify-content: flex-end; gap: 8px; }
+.guide .g-btn { border: 1px solid color-mix(in srgb, var(--panel) 35%, transparent); background: transparent; color: var(--panel); border-radius: 7px; padding: 5px 14px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.guide .g-btn:disabled { opacity: .35; cursor: default; }
+.guide .g-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+#tour { padding: 5px 10px; }
+
+/* ---------- what if */
+.wrows { display: flex; flex-direction: column; gap: 6px; }
+.wrow { display: grid; grid-template-columns: minmax(0, 1fr); gap: 3px; font-size: 12px; color: var(--muted); }
+.wrow .speed { width: max-content; max-width: 100%; }
+.wres { margin-top: 10px; font-size: 12.5px; border-radius: 8px; padding: 7px 10px; border: 1px solid var(--line); }
+.wres.good { box-shadow: inset 3px 0 0 var(--good); }
+.wres.bad { box-shadow: inset 3px 0 0 var(--crit); }
+.wtrace { font-size: 10.5px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+.wacts { display: flex; gap: 6px; margin-top: 8px; }
+.wacts .btn:disabled { opacity: .45; cursor: default; }
+
+@media (max-width: 899px) {
+  #stage.guiding { height: 88vh; max-height: 800px; }
+  .view-pane > header { grid-template-columns: minmax(0, 1fr); }
+  .view-pane > header h2 { font-size: 18px; }
+  .revrail { justify-content: flex-start; }
+  .guide p { font-size: 13px; }
+}
+
+.guide.float { position: fixed; z-index: 30; }
+
+.view-pane.narrow .doc-body { grid-template-columns: minmax(0, 1fr); }
+.view-pane.narrow .doc-fb { order: -1; }
+.view-pane.narrow .doc-ptr { display: none; }
+.view-pane.narrow > header { grid-template-columns: minmax(0, 1fr); }
+.view-pane.narrow .revrail { justify-content: flex-start; }
+
+</style>
+</head>
+<body>
+<div id="app">
+  <section id="stage" aria-label="Declaration chain">
+    <svg id="wires" aria-hidden="true"></svg>
+    <div id="desks"></div>
+    <div id="doc" class="view-pane" hidden></div>
+    <div id="boxv" class="view-pane" hidden></div>
+    <div id="credit">by emilio.solanes</div>
+
+    <div id="brand" class="hud">
+      <div class="eyebrow">Hutchison Ports ECT Delta · Rotterdam</div>
+      <h1>DG declarations</h1>
+      <div id="lens" role="group" aria-label="Whose copy you see">
+        <button type="button" data-lens="ALL" aria-pressed="true">All<small>every party</small></button>
+        <button type="button" data-lens="SHP" aria-pressed="false">Shipper<small id="lens-shp">Veldmeer</small></button>
+        <button type="button" data-lens="MSC" aria-pressed="false">MSC<small>carrier</small></button>
+        <button type="button" data-lens="ECT" aria-pressed="false">ECT Delta<small>terminal</small></button>
+      </div>
+      <div id="clock"><span class="d" id="clock-d">Sun 18 Oct</span><span class="t" id="clock-t">13:30</span></div>
+      <div class="tag"><i></i>Simulated · DCSA DGD 1.0 draft messages</div>
+    </div>
+
+    <div id="guide" class="guide" hidden role="region" aria-label="Guided tour" aria-live="polite">
+      <div class="g-top"><span class="g-n" id="guide-n">1 / 11</span><button type="button" class="g-skip" id="guide-skip">Skip tour</button></div>
+      <p id="guide-text"></p>
+      <div class="g-acts"><button type="button" class="g-btn" id="guide-back">Back</button><button type="button" class="g-btn primary" id="guide-next">Next</button></div>
+    </div>
+
+    <div id="views" class="hud" role="group" aria-label="Stage view">
+      <button type="button" data-view="chain" aria-pressed="true">Chain</button>
+      <button type="button" data-view="doc" aria-pressed="false">Document</button>
+      <button type="button" data-view="box" aria-pressed="false">Box</button>
+    </div>
+  </section>
+
+  <div id="card" class="hud" hidden aria-live="polite"></div>
+
+  <section id="bottom" aria-label="Timeline">
+    <div class="panel">
+      <div class="controls">
+        <button id="play" type="button" aria-label="Pause"></button>
+        <button id="tour" class="btn" type="button">Tour</button>
+        <div class="speed" role="group" aria-label="Simulation speed">
+          <button type="button" data-speed="10" aria-pressed="true">10 min/s</button>
+          <button type="button" data-speed="30" aria-pressed="false">30 min/s</button>
+          <button type="button" data-speed="90" aria-pressed="false">90 min/s</button>
+          <button type="button" data-speed="240" aria-pressed="false">4 h/s</button>
+        </div>
+        <div class="moments" id="moments" aria-label="Key moments"></div>
+      </div>
+      <div class="gantt" id="gantt"></div>
+      <div class="legend" id="g-legend" style="margin-top:8px"></div>
+    </div>
+  </section>
+
+  <aside id="side" aria-label="Live panels">
+    <div class="panel" id="p-decl">
+      <header><h3>Declarations</h3><span class="meta" id="d-meta"></span></header>
+      <div class="vlist" id="dlist"></div>
+    </div>
+
+    <div class="panel" id="p-ex">
+      <header><h3>DGD exchange</h3><span class="meta" id="x-meta">All parties · DGD 1.0</span></header>
+      <div class="stats">
+        <div class="stat"><div class="v" id="x-sent">0</div><div class="k">messages in the last 24 h</div></div>
+        <div class="stat"><div class="v" id="x-open">0</div><div class="k" id="x-open-k">waiting for review</div></div>
+        <div class="stat"><div class="v" id="x-acc">0<small>min</small></div><div class="k" id="x-acc-k">last issue to MSC acceptance</div></div>
+      </div>
+      <div class="erpa-bar" id="x-bar"></div>
+      <div class="legend" id="x-legend"></div>
+      <div class="outcomes" id="x-out"></div>
+    </div>
+
+    <div class="panel" id="p-what">
+      <header><h3>What if</h3><span class="meta">MSCU 482901 7 after the gate stop</span></header>
+      <div class="wrows" id="wi-rows"></div>
+      <div class="wres" id="wi-res"></div>
+      <div class="wtrace mono" id="wi-trace"></div>
+      <div class="wacts"><button class="btn" type="button" id="wi-replay">Replay the gate stop</button><button class="btn" type="button" id="wi-reset">Reset</button></div>
+    </div>
+
+    <div class="panel" id="p-parties">
+      <header><h3>Parties</h3><span class="meta">Push or pull, per flow</span></header>
+      <div class="plist" id="plist"></div>
+      <div class="spark" id="x-spark" aria-label="Messages per hour, last 24 hours"></div>
+      <div class="legend" style="margin-top:4px"><span>Messages per hour, last 24 h</span></div>
+    </div>
+
+    <div class="panel" id="p-alerts">
+      <header><h3>Alerts</h3><span class="meta" id="a-meta">Latest first</span></header>
+      <div class="alerts" id="alerts"></div>
+    </div>
+
+    <div class="panel" id="p-feed">
+      <header><h3>Message stream</h3><span class="meta">Tap a message for its payload</span></header>
+      <div class="feed" id="feed"></div>
+    </div>
+
+    <div class="panel">
+      <details class="about" id="about">
+        <summary>About this model</summary>
+        <p>Personal project by emilio.solanes. Simulated data. Not affiliated with or endorsed by the companies shown.</p>
+        <p>Six export containers for MSC Gülsün at Hutchison Ports ECT Delta, Rotterdam, from Thursday 15 to Tuesday 20 October 2026. Every declaration, request and feedback item is exchanged as a DCSA Dangerous Goods Declaration (DGD) 1.0 message. DGD 1.0 is still in development; this model follows the alpha snapshot of 6 November 2026.</p>
+        <ul>
+          <li><b>Real:</b> MSC Gülsün, MSC and Hutchison Ports ECT Delta; UN numbers, proper shipping names, IMDG classes and EmS codes; the DGD 1.0 endpoints, resource names and vocabularies (declaration status DRAFT, FINAL, WITHDRAWN; review status PENDING, ACCEPTED, REJECTED; severity ERROR, WARN, INFO; RFC 6901 property paths).</li>
+          <li><b>Computed, not scripted:</b> shipper issue times and the gate stop are inputs. Everything else follows from rules: Haventrek relays in 2 min; MSC checks a revision in 20 min and reports an accepted FINAL revision to the Harbour Master 3 min later; a new UN number is a reclassification, so r3 goes to MSC's DG desk, which re-checks stowage and segregation (45 min by default); ECT Delta pulls <span class="mono">GET /dgds</span> per booking with <span class="mono">issuedDateTimeMin</span> set 10 min before its previous poll, so a revision still being relayed is never missed, and drops the repeats this creates by reference and revision; shippers pull feedback the same way with a 5 min overlap and drop repeats by feedback ID; ECT Delta checks a FINAL revision 8 min after pulling it; the gate releases a held box 12 min after both ECT Delta has accepted the correction and MSC has re-approved the booking. The What if panel changes the polling intervals, the correction time and the re-approval time and recalculates whether the box makes the cut-off.</li>
+          <li><b>Assumed:</b> a DG cut-off at ECT Delta on Sunday 18:00; the rule timings above; a gate check that reads hazard placards; all times, volumes and weights; a weekly service, so a rolled box waits 7 days.</li>
+          <li><b>Party views:</b> Shipper, MSC and ECT Delta show only what that party has received or sent by the clock time. The physical lane under the chain is the world as it is, not any party's knowledge. All is the ops floor view across every party.</li>
+          <li><b>Fictional:</b> Veldmeer Chemicals, Oostkade Coatings, Kadeveld Energy, Zeelwijk Process, Akkerzand Agro, Haventrek Logistics and their Singapore consignees; all booking, request and declaration references, seal numbers and the voyage number. Emergency contacts use the reserved .example domain. Container numbers carry valid check digits and are made up.</li>
+          <li><b>Not modelled:</b> stowage and segregation planning; the Document Exchange transfer of referenced documents; registration, authorization and security; non-API exchange (UC9); MSC Gülsün's own port call, which video 1 covers.</li>
+          <li><b>Known simplifications:</b> the Harbour Master receives a direct push, as in a port without a community system, while in Rotterdam dangerous goods on board are reported through Portbase's Notification Dangerous Goods service; MSC's re-approval reaches the gate outside DGD (an updated load list) and is not drawn as a message; a misdeclared UN number can also bring a fee or a refusal by the terminal, which is not modelled; routine checks take a fixed 20 min; today most of this exchange runs on email, PDFs, portals and EDI, and this model shows how it would run on DGD 1.0.</li>
+          <li><b>Payloads:</b> bodies carry the fields this story uses plus those the DGD 1.0 conformance content checks ask for (parties, seals, certificates, emergency contact); other optional properties are left out. They validate against the alpha OpenAPI schema. Bodies follow the generated OpenAPI wrappers (<span class="mono">DGDeclarations</span>, <span class="mono">DGDFeedbacks</span>, <span class="mono">DGDRequests</span>). DGD defines no sending-party headers, so sender and receiver come from <span class="mono">submissionOriginator</span>, <span class="mono">forwardingEvents</span> and the feedback <span class="mono">originatingParty</span>.</li>
+          <li><b>Colours:</b> Requested purple, Declared blue, Feedback amber, Accepted green. Accepted is a feedback item whose review status is ACCEPTED; it never changes the declaration's own status, which only the shipper sets. Red marks an ERROR, a rejection or a held box.</li>
+        </ul>
+        <p>Sources: DCSA DGD 1.0.0 alpha package (use cases, information model guide, technical appendix, examples, OpenAPI). <a href="https://support.portbase.com/en/services/notification-dangerous-goods" target="_blank" rel="noopener">Portbase Notification Dangerous Goods</a>, <a href="https://english.ilent.nl/topics/port-state-control/mandatory-ship-notifications" target="_blank" rel="noopener">ILT mandatory ship notifications</a>, <a href="https://en.wikipedia.org/wiki/G%C3%BCls%C3%BCn-class_container_ship" target="_blank" rel="noopener">MSC Gülsün</a>, <a href="https://www.ect.nl/en/terminals/hutchison-ports-ect-delta" target="_blank" rel="noopener">Hutchison Ports ECT Delta</a>.</p>
+        <p>Code: MIT license.</p>
+      </details>
+    </div>
+  </aside>
+</div>
+
+<div id="json" hidden role="dialog" aria-modal="false" aria-labelledby="json-title">
+  <header>
+    <h3 id="json-title">Message</h3>
+    <div style="display:flex;gap:6px"><button class="btn" type="button" id="json-copy">Copy</button><button class="btn" type="button" id="json-close" aria-label="Close">Close</button></div>
+    <div class="sub" id="json-sub"></div>
+  </header>
+  <div class="meta" id="json-meta"></div>
+  <div class="req" id="json-req"></div>
+  <pre id="json-pre"></pre>
+</div>
+
+<script>
+(() => {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const lerp = (a, b, u) => a + (b - a) * u;
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let ptrOut = '';
+
+  // ======================================================================= time
+  const DAYN = ['Thu', 'Fri', 'Sat', 'Sun', 'Mon', 'Tue', 'Wed'];
+  const DATE = [15, 16, 17, 18, 19, 20, 21];
+  const T = (d, h, m = 0) => d * 1440 + h * 60 + m;
+  const T_END = T(5, 12, 0);
+  const T_START = T(3, 13, 30);
+  const CUTOFF = T(3, 18, 0);
+  const pad = (n) => String(n).padStart(2, '0');
+  const mod = (a, b) => ((a % b) + b) % b;
+  const hhmm = (t) => { const m = mod(Math.floor(t), 1440); return pad(Math.floor(m / 60)) + ':' + pad(m % 60); };
+  const dIdx = (t) => Math.floor(t / 1440);
+  const dayName = (t) => DAYN[dIdx(t)];
+  const dt2 = (t) => `${dayName(t).slice(0, 2)} ${hhmm(t)}`;
+  const dateLabel = (t) => `${dayName(t)} ${DATE[dIdx(t)]} Oct`;
+  const iso = (t) => `2026-10-${DATE[dIdx(t)]}T${hhmm(t)}:00+02:00`;
+  const isoDate = (t) => `2026-10-${DATE[dIdx(t)]}`;
+  const dur = (m) => { m = Math.max(0, Math.round(m)); const h = Math.floor(m / 60), r = m % 60; return h ? `${h} h ${pad(r)} min` : `${r} min`; };
+  const durShort = (m) => { m = Math.max(0, Math.round(m)); const h = Math.floor(m / 60), r = m % 60; return h ? `${h}<small>h</small> ${pad(r)}<small>min</small>` : `${r}<small>min</small>`; };
+
+  function uuid(seed) {
+    let h = 2166136261 >>> 0;
+    for (const c of seed) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0; }
+    let s = '';
+    for (let i = 0; i < 32; i++) { h ^= h << 13; h >>>= 0; h ^= h >>> 17; h ^= h << 5; h >>>= 0; s += (h % 16).toString(16); }
+    return `${s.slice(0, 8)}-${s.slice(8, 12)}-4${s.slice(13, 16)}-${'89ab'[parseInt(s[16], 16) % 4]}${s.slice(17, 20)}-${s.slice(20, 32)}`;
+  }
+
+  // ======================================================================= parties
+  const ORDER = ['SHP', 'FWD', 'MSC', 'ECT', 'HM'];
+  const PARTY = {
+    FWD: { name: 'Haventrek Logistics', short: 'Haventrek', kind: 'Forwarder', role: 'Forwarder' },
+    MSC: { name: 'MSC', short: 'MSC', kind: 'Carrier', role: 'Consumer · forwarder' },
+    ECT: { name: 'Hutchison Ports ECT Delta', short: 'ECT Delta', kind: 'Terminal', role: 'Consumer' },
+    HM: { name: 'Port of Rotterdam Harbour Master', short: 'Harbour Master', kind: 'Port authority', role: 'Consumer' },
+  };
+  const SHIPPER = {
+    VLD: { name: 'Veldmeer Chemicals BV', short: 'Veldmeer', site: 'Moerdijk' },
+    OKC: { name: 'Oostkade Coatings BV', short: 'Oostkade', site: 'Dordrecht' },
+    KDV: { name: 'Kadeveld Energy BV', short: 'Kadeveld', site: 'Tilburg' },
+    ZWP: { name: 'Zeelwijk Process BV', short: 'Zeelwijk', site: 'Botlek' },
+    AKZ: { name: 'Akkerzand Agro BV', short: 'Akkerzand', site: 'Barendrecht' },
+  };
+  const VESSEL = 'MSC GÜLSÜN', VOY = 'LN643W';
+  const pShort = (p, b) => (p === 'SHP' ? SHIPPER[b.shp].short : PARTY[p].short);
+  const pName = (p, b) => (p === 'SHP' ? SHIPPER[b.shp].name : PARTY[p].name);
+  const pKind = (p) => (p === 'SHP' ? 'Shipper' : PARTY[p].kind);
+
+  // ======================================================================= boxes and declaration revisions
+  const fmtEq = (e) => `${e.slice(0, 4)} ${e.slice(4, 10)} ${e.slice(10)}`;
+  const BOXES = [
+    {
+      id: 'H', eq: 'MSCU4829017', iso: '22G1', tare: 2250, shp: 'VLD', via: true, ref: 'DGD-VLD-26-0418', bkg: 'EBKG04182736', line: 'DG-001', req: 'MSC-DGDR-0412',
+      placards: ['3', '8'], cargo: 'drums', label: 'Industrial cleaner',
+      revs: [
+        { n: 1, t: T(1, 10, 20), status: 'DRAFT', g: { un: '1993', psn: 'FLAMMABLE LIQUID, N.O.S.', tech: 'propan-2-ol', cls: '3', sub: [], pg: 2, ems: 'F-E S-E', pkg: [80, '1A1', 'Steel drums, 200 L'], gross: 14400 } },
+        { n: 2, t: T(2, 9, 40), status: 'FINAL' },
+        { n: 3, t: T(3, 15, 31), status: 'FINAL', g: { un: '2924', psn: 'FLAMMABLE LIQUID, CORROSIVE, N.O.S.', tech: 'propan-2-ol, 2-aminoethanol', sub: ['8'], ems: 'F-E S-C' } },
+      ],
+      phys: [[0, 'plant']], // computed in build()
+    },
+    {
+      id: 'P', eq: 'MEDU7312066', iso: '22G1', tare: 2200, shp: 'OKC', via: false, ref: 'DGD-OKC-26-1187', bkg: 'EBKG04182751', line: 'DG-001',
+      placards: ['3'], cargo: 'pails', label: 'Paint',
+      revs: [{ n: 1, t: T(0, 14, 10), status: 'FINAL', g: { un: '1263', psn: 'PAINT', tech: '', cls: '3', sub: [], pg: 3, ems: 'F-E S-E', pkg: [800, '1A2', 'Steel pails, 20 L'], gross: 19600 } }],
+      phys: [[0, 'plant'], [T(2, 7, 50), 'road'], [T(2, 8, 40), 'gate'], [T(2, 8, 50), 'yard'], [T(4, 22, 5), 'quay'], [T(4, 22, 15), 'aboard']],
+    },
+    {
+      id: 'L', eq: 'MSMU5520188', iso: '22G1', tare: 2230, shp: 'KDV', via: true, ref: 'DGD-KDV-26-0077', bkg: 'EBKG04182790', line: 'DG-001', req: 'MSC-DGDR-0436',
+      placards: ['9'], cargo: 'crates', label: 'Battery modules',
+      revs: [
+        { n: 1, t: T(2, 11, 10), status: 'FINAL', g: { un: '3480', psn: 'LITHIUM ION BATTERIES', tech: '', cls: '9', sub: [], pg: null, ems: 'F-A S-I', pkg: [24, '4G', 'Fibreboard boxes on pallets'], gross: 11800 }, docs: [{ role: 'LITHIUM_BATTERY_DOCUMENT', status: 'DRAFT', url: 'https://docs.kadeveld.example/un38-3/KDV-26-0077' }] },
+        { n: 2, t: T(2, 15, 20), status: 'FINAL', docs: [{ role: 'LITHIUM_BATTERY_DOCUMENT', status: 'FINAL', url: 'https://docs.kadeveld.example/un38-3/KDV-26-0077' }] },
+      ],
+      phys: [[0, 'plant'], [T(3, 9, 40), 'road'], [T(3, 10, 30), 'gate'], [T(3, 10, 40), 'yard'], [T(4, 23, 30), 'quay'], [T(4, 23, 40), 'aboard']],
+    },
+    {
+      id: 'C', eq: 'MSCU3902577', iso: '22G1', tare: 2250, shp: 'ZWP', via: true, ref: 'DGD-ZWP-26-0215', bkg: 'EBKG04182803', line: 'DG-001',
+      placards: ['8'], cargo: 'ibc', label: 'Hydrochloric acid',
+      revs: [{ n: 1, t: T(1, 15, 0), status: 'FINAL', g: { un: '1789', psn: 'HYDROCHLORIC ACID', tech: '', cls: '8', sub: [], pg: 2, ems: 'F-A S-B', pkg: [10, '31HA1', 'Composite IBCs, 1,000 L'], gross: 11800 } }],
+      phys: [[0, 'plant'], [T(3, 8, 30), 'road'], [T(3, 9, 10), 'gate'], [T(3, 9, 20), 'yard'], [T(5, 3, 10), 'quay'], [T(5, 3, 20), 'aboard']],
+    },
+    {
+      id: 'G', eq: 'MEDU6634094', iso: '22G1', tare: 2200, shp: 'AKZ', via: true, ref: 'DGD-AKZ-26-0031', bkg: 'EBKG04182815', line: 'DG-001',
+      placards: ['FUM'], cargo: 'bags', label: 'Fumigated feed',
+      fum: { isFumigated: true, fumigantName: 'PHOSPHINE', fumigationMethod: 'Phosphine tablets', fumigationDateTime: T(2, 8, 0), dosage: '2 g/m3', isVentilated: false },
+      revs: [{ n: 1, t: T(2, 13, 0), status: 'FINAL', g: { un: '3359', psn: 'FUMIGATED CARGO TRANSPORT UNIT', tech: '', cls: '9', sub: [], pg: null, ems: '', pkg: [960, '5H4', 'Woven bags of animal feed, 25 kg'], gross: 24600 } }],
+      phys: [[0, 'plant'], [T(3, 11, 0), 'road'], [T(3, 11, 45), 'gate'], [T(3, 11, 55), 'yard'], [T(4, 21, 20), 'quay'], [T(4, 21, 30), 'aboard']],
+    },
+    {
+      id: 'W', eq: 'MSDU2047711', iso: '22G1', tare: 2250, shp: 'VLD', via: true, ref: 'DGD-VLD-26-0421', bkg: 'EBKG04182744', line: 'DG-001',
+      placards: ['3'], cargo: 'drums', label: 'Resin solution',
+      revs: [
+        { n: 1, t: T(0, 16, 30), status: 'DRAFT', g: { un: '1866', psn: 'RESIN SOLUTION', tech: '', cls: '3', sub: [], pg: 3, ems: 'F-E S-E', pkg: [80, '1A1', 'Steel drums, 200 L'], gross: 16200 } },
+        { n: 2, t: T(1, 11, 20), status: 'WITHDRAWN' },
+      ],
+      phys: [[0, 'plant'], [T(1, 11, 20), 'gone']],
+    },
+  ];
+  const BOX = Object.fromEntries(BOXES.map((b) => [b.id, b]));
+  for (const b of BOXES) {
+    b.eqF = fmtEq(b.eq);
+    let prev = null;
+    for (const r of b.revs) {
+      const g = { ...(prev ? prev.full.g : {}), ...(r.g || {}) };
+      r.full = { status: r.status, g, docs: r.docs || (prev ? prev.full.docs : null) || [] };
+      prev = r;
+    }
+  }
+
+  // ======================================================================= scenario rules and what-if parameters
+  // The scenario is computed, not scripted: shipper issue times and the gate stop are fixed inputs,
+  // everything else follows from these rules and the three what-if parameters.
+  const PDEF = { ectPoll: 30, shpPoll: 30, fix: 60, reapprove: 45 };
+  const params = { ...PDEF };
+  const RELAY = 2;        // forwarder relays a declaration or feedback item after 2 min
+  const REVIEW = 20;      // MSC checks a revision 20 min after it arrives; a reclassification (new UN number) instead goes to its DG desk, params.reapprove
+  const HM_DELAY = 3;     // MSC pushes an accepted FINAL revision to the Harbour Master 3 min after accepting it
+  const ECT_CHECK = 8;    // ECT Delta checks a FINAL revision 8 min after pulling it
+  const RELEASE = 12;     // the gate releases a held box 12 min after ECT Delta accepts the corrected revision
+  const OVL_D = 10;       // ECT Delta overlaps its GET /dgds window by 10 min and drops repeats by reference and revision
+  const OVL_F = 5;        // shippers overlap their GET /dgd-feedbacks window by 5 min and drop repeats by feedback ID
+  const GATE = T(3, 14, 20), ROAD = T(3, 13, 5);
+  const tick = (t, P) => Math.ceil(t / P - 1e-9) * P;
+  const REVIEW_TXT = {
+    'H-m1': { msg: 'Revision 1 reviewed against booking EBKG04182736. No issues found.' },
+    'H-m2': { msg: 'Revision 2 reviewed. Status FINAL noted.' },
+    'H-m3': { msg: 'Reclassified to UN 2924, class 3 with subsidiary risk 8. DG desk re-approved the booking after re-checking stowage and segregation.' },
+    'L-m1': { sev: 'WARN', code: 'PROPERTY_VALUE_MAY_CHANGE', review: 'PENDING', path: '/exchange/documentReferences/0/documentStatus', msg: 'The UN 38.3 test summary is referenced as DRAFT. Review stays pending until the final summary is referenced.' },
+    'L-m2': { msg: 'Final UN 38.3 test summary referenced. Revision 2 accepted.' },
+    'G-m1': { msg: 'Revision 1 reviewed. Fumigation details noted on the equipment.' },
+    'H-e2': { msg: 'Revision 2 matches the export list for MSC Gülsün LN643W.' },
+  };
+
+  let MSGS = [], FB = {}, MSG = {}, byBox = {}, involved = {}, ALERTS = [], MOMENTS = [], EV = {}, STEPS = [], seq = 0;
+  const add = (o) => { o.id = 'm' + (++seq); MSGS.push(o); return o; };
+  const R = (box, t, from, to, o = {}) => add({ k: 'R', box, t, from, to, op: o.pull ? 'GET /dgd-requests' : 'POST /dgd-requests', ...o });
+  const D = (box, t, from, to, rev, o = {}) => add({ k: 'D', box, t, from, to, rev, op: o.pull ? 'GET /dgds' : 'POST /dgds', ...o });
+  const fb = (id, o) => (FB[id] = { id, uuid: uuid('fb-' + id), ...o });
+  const FBm = (id, t, from, to, o = {}) => { const f = FB[id]; return add({ k: f.review === 'ACCEPTED' ? 'A' : 'F', box: f.box, t, from, to, rev: f.rev, fb: f, op: o.pull ? 'GET /dgd-feedbacks' : 'POST /dgd-feedbacks', ...o }); };
+  const ECT_ACC_MSG = (b, n, made) => (b.id === 'H' && n === 3 ? 'Revision 3 matches the placards. The gate releases the box once MSC has re-approved the reclassified booking.' : (REVIEW_TXT[`${b.id}-e${n}`] || {}).msg || `Revision ${n} matches the export list.`);
+
+  function build() {
+    MSGS = []; FB = {}; seq = 0;
+    const Pe = params.ectPoll, Ps = params.shpPoll;
+    const H = BOX.H;
+
+    // requests
+    R('H', T(0, 9, 0), 'MSC', 'FWD');
+    R('H', T(0, 9, 0) + RELAY, 'FWD', 'SHP', { relay: true });
+    R('L', T(1, 12, 0), 'MSC', 'FWD');
+    R('L', T(1, 12, 0) + RELAY, 'FWD', 'SHP', { relay: true });
+
+    // the gate stop and ECT Delta's error, relayed up the chain
+    const errT = GATE + 4, relayErr = errT + 1;
+    fb('H-err', { box: 'H', t: errT, origin: 'ECT', rev: 2, sev: 'ERROR', code: 'PROPERTY_VALUE_MUST_CHANGE', review: 'REJECTED', line: 'DG-001', path: '/dangerousGoods/0/subsidiaryRisks', msg: 'Gate check found class 3 and class 8 placards on all four sides. Revision 2 declares UN 1993, class 3, with no subsidiary risk. The box is held until the classification is corrected.' });
+    FBm('H-err', errT, 'ECT', 'MSC');
+    FBm('H-err', relayErr, 'MSC', 'FWD', { relay: true });
+    const seenErr = tick(relayErr, Ps);          // the shipper's next feedback poll
+    H.revs[2].t = seenErr + params.fix;          // the corrected revision
+
+    // issue, relay, MSC review, Harbour Master push
+    for (const b of BOXES) for (const r of b.revs) {
+      if (b.via) { D(b.id, r.t, 'SHP', 'FWD', r.n); D(b.id, r.t + RELAY, 'FWD', 'MSC', r.n, { relay: true }); r.mscAt = r.t + RELAY; }
+      else { D(b.id, r.t, 'SHP', 'MSC', r.n); r.mscAt = r.t; }
+      r.mscReview = null; r.ectAt = null; r.ectAcc = null;
+      if (r.status === 'WITHDRAWN') continue;
+      const o = REVIEW_TXT[`${b.id}-m${r.n}`] || {};
+      const f = fb(`${b.id}-m${r.n}`, { box: b.id, t: r.mscAt + (b.id === 'H' && r.n === 3 ? params.reapprove : REVIEW), origin: 'MSC', rev: r.n, sev: o.sev || 'INFO', code: o.code || 'INFORMATIONAL_MESSAGE', review: o.review || 'ACCEPTED', path: o.path, msg: o.msg || `Revision ${r.n} reviewed. No issues found.` });
+      r.mscReview = f;
+      FBm(f.id, f.t, 'MSC', b.via ? 'FWD' : 'SHP');
+      if (f.review === 'ACCEPTED' && r.status === 'FINAL') D(b.id, f.t + HM_DELAY, 'MSC', 'HM', r.n);
+    }
+
+    // ECT Delta pulls GET /dgds per booking; MSC returns the latest revision issued inside the window
+    for (const b of BOXES) {
+      let got = 0;
+      for (let k = tick(Math.min(...b.revs.map((r) => r.mscAt)), Pe); k <= T_END; k += Pe) {
+        let rv = null; for (const r of b.revs) if (r.mscAt <= k) rv = r;
+        const qmin = k - Pe - OVL_D;
+        if (!rv || rv.t < qmin) continue;
+        if (rv.n > got) {
+          D(b.id, k, 'MSC', 'ECT', rv.n, { pull: true, qmin });
+          got = rv.n; rv.ectAt = k;
+          if (rv.status === 'FINAL') {
+            const f = fb(`${b.id}-e${rv.n}`, { box: b.id, t: k + ECT_CHECK, origin: 'ECT', rev: rv.n, sev: 'INFO', code: 'INFORMATIONAL_MESSAGE', review: 'ACCEPTED', msg: '' });
+            rv.ectAcc = f;
+            FBm(f.id, f.t, 'ECT', 'MSC');
+            if (b.id === 'H' && rv.n === 3) FBm(f.id, f.t + 1, 'MSC', 'FWD', { relay: true });
+          }
+        } else D(b.id, k, 'MSC', 'ECT', rv.n, { pull: true, dup: true, qmin });
+      }
+    }
+    const e3 = H.revs[2].ectAcc;
+    // release needs both: ECT Delta's copy matches the placards, and MSC's DG desk has re-approved the reclassified booking
+    const rel = Math.max(e3.t, H.revs[2].mscReview.t) + RELEASE, made = rel <= CUTOFF;
+    e3.msg = ECT_ACC_MSG(H, 3, made);
+    for (const b of BOXES) for (const r of b.revs) if (r.ectAcc && !r.ectAcc.msg) r.ectAcc.msg = ECT_ACC_MSG(b, r.n, true);
+
+    // shippers behind Haventrek pull GET /dgd-feedbacks per declaration
+    for (const b of BOXES) {
+      if (!b.via) continue;
+      const uniq = new Map();
+      for (const m of MSGS) if (m.box === b.id && m.fb && m.to === 'FWD' && !uniq.has(m.fb.id)) uniq.set(m.fb.id, { f: m.fb, avail: m.t });
+      const list = [...uniq.values()]; if (!list.length) continue;
+      const seen = new Set(), last = Math.max(...list.map((x) => x.avail));
+      for (let k = tick(Math.min(...list.map((x) => x.avail)), Ps); k <= T_END && k <= last + 2 * Ps + OVL_F; k += Ps) {
+        const qmin = k - Ps - OVL_F;
+        for (const x of list) if (x.avail <= k && x.f.t >= qmin) { FBm(x.f.id, k, 'FWD', 'SHP', { pull: true, qmin, dup: seen.has(x.f.id) }); seen.add(x.f.id); }
+      }
+    }
+
+    // the hero box: held until ECT Delta accepts r3, then released; loaded only if that beats the cut-off
+    H.phys = [[0, 'plant'], [ROAD, 'road'], [GATE, 'held'], [rel, made ? 'yard' : 'rolled']];
+    if (made) H.phys.push([T(5, 5, 0), 'quay'], [T(5, 5, 10), 'aboard']);
+
+    MSGS.sort((a, b) => a.t - b.t || (+a.id.slice(1)) - (+b.id.slice(1)));
+    MSG = Object.fromEntries(MSGS.map((m) => [m.id, m]));
+    byBox = {}; for (const b of BOXES) byBox[b.id] = MSGS.filter((m) => m.box === b.id);
+    involved = {};
+    for (const b of BOXES) { const s = new Set(['SHP']); for (const m of byBox[b.id]) { s.add(m.from); s.add(m.to); } involved[b.id] = ORDER.filter((p) => s.has(p)); }
+
+    // key times of the hero story
+    const [r1, r2, r3] = H.revs;
+    const firstHold = (p, n) => { const m = byBox.H.find((x) => x.k === 'D' && x.to === p && x.rev === n); return m ? m.t : null; };
+    EV = {
+      req: T(0, 9, 0), r1: r1.t, acc1: r1.mscReview.t, r2: r2.t, ectR2: r2.ectAt, hmR2: firstHold('HM', 2), gate: GATE, err: errT, relayErr, seen: seenErr,
+      r3: r3.t, r3msc: r3.mscAt, acc3: r3.mscReview.t, hm3: firstHold('HM', 3), ect3: r3.ectAt, ectAcc3: e3.t, rel, made,
+    };
+    EV.all3 = Math.max(r3.t, firstHold('FWD', 3), r3.mscAt, EV.hm3, EV.ect3);
+    EV.allR2 = Math.max(r2.t, firstHold('FWD', 2), r2.mscAt, EV.hmR2, EV.ectR2);
+    const dupH = byBox.H.find((m) => m.dup && m.to === 'ECT') || MSGS.find((m) => m.dup && m.to === 'ECT');
+    EV.dup = dupH;
+    buildAlerts(); buildMoments(); buildSteps();
+  }
+
+  // ======================================================================= knowledge at time t
+  const countTo = (t) => { let lo = 0, hi = MSGS.length; while (lo < hi) { const mid = (lo + hi) >> 1; if (MSGS[mid].t <= t) lo = mid + 1; else hi = mid; } return lo; };
+  const issuedAt = (b, t) => { let r = null; for (const v of b.revs) if (v.t <= t) r = v; return r; };
+  function held(b, p, t) {
+    if (p === 'SHP') { const r = issuedAt(b, t); return r ? { n: r.n, at: r.t, copies: 1, rev: r } : null; }
+    let best = null; const copies = {};
+    for (const m of byBox[b.id]) {
+      if (m.t > t) break;
+      if (m.k !== 'D' || m.to !== p) continue;
+      copies[m.rev] = (copies[m.rev] || 0) + 1;
+      if (!best || m.rev > best.n) best = { n: m.rev, at: m.t };
+    }
+    if (!best) return null;
+    best.copies = copies[best.n]; best.rev = b.revs[best.n - 1];
+    return best;
+  }
+  const knows = (m, p) => m.from === p || m.to === p;
+  function lastOf(b, p, t, kinds) { let r = null; for (const m of byBox[b.id]) { if (m.t > t) break; if (kinds.includes(m.k) && knows(m, p)) r = m; } return r; }
+  function fbKnown(b, p, t) { // feedback items this party has seen by t, first time seen
+    const out = new Map();
+    for (const m of byBox[b.id]) { if (m.t > t) break; if (!m.fb) continue; if (p === 'ALL' || knows(m, p)) { if (!out.has(m.fb.id)) out.set(m.fb.id, { f: m.fb, at: m.t, via: m }); } }
+    return [...out.values()];
+  }
+  function openError(b, p, t) {
+    const h = held(b, p, t); if (!h) return null;
+    for (const k of fbKnown(b, p, t)) if (k.f.sev === 'ERROR' && k.f.rev === h.n) return k;
+    return null;
+  }
+  function received(b, p, t) {
+    if (p === 'SHP') return b.revs.filter((r) => r.t <= t).map((r) => ({ n: r.n, at: r.t, rev: r }));
+    const out = new Map();
+    for (const m of byBox[b.id]) { if (m.t > t) break; if (m.k === 'D' && m.to === p && !out.has(m.rev)) out.set(m.rev, { n: m.rev, at: m.t, rev: b.revs[m.rev - 1] }); }
+    return [...out.values()].sort((a, c) => a.n - c.n);
+  }
+  const LENS_NAME = { SHP: 'the shipper', MSC: 'MSC', ECT: 'ECT Delta' };
+  const physAt = (b, t) => { let s = b.phys[0][1], at = 0; for (const [pt, ps] of b.phys) if (pt <= t) { s = ps; at = pt; } return { s, at }; };
+  function acceptedBy(b, p, n, t) { let r = null; for (const m of byBox[b.id]) { if (m.t > t) break; if (m.fb && m.fb.origin === p && m.rev === n && m.from === p) r = m; } return r && r.k === 'A' ? r : null; }
+  function reqAt(b, t) { for (const m of byBox[b.id]) { if (m.t > t) break; if (m.k === 'R') return m; } return null; }
+
+  function pillFor(b, t, viewer = 'ALL') {
+    const ph = physAt(b, t).s;
+    const all = viewer === 'ALL';
+    const r = all ? issuedAt(b, t) : (held(b, viewer, t) || {}).rev;
+    if ((r && r.status === 'WITHDRAWN') || (all && ph === 'gone')) return { c: 'done', txt: 'Withdrawn' };
+    if (all || viewer === 'ECT') {   // the terminal sees its own gate and yard; DGD messages tell the others nothing about them
+      if (ph === 'held') return { c: 'stop', txt: 'Held at gate' };
+      if (ph === 'rolled') return { c: 'stop', txt: 'Rolled' };
+      if (ph === 'aboard') return { c: 'done', txt: 'Loaded' };
+      if (ph === 'quay') return { c: 'cargo', txt: 'Loading' };
+      if (ph === 'yard' || ph === 'gate') return { c: 'cargo', txt: 'In DG yard' };
+      if (all && ph === 'road') return { c: 'naut', txt: 'On the road' };
+    }
+    if (!all && openError(b, viewer, t)) return { c: 'stop', txt: 'Rejected' };
+    if (!r) { const q = all ? reqAt(b, t) : lastOf(b, viewer, t, ['R']); return q ? { c: 'req', txt: 'Requested' } : { c: '', txt: all ? 'Booked' : 'No copy' }; }
+    const who = all ? 'MSC' : viewer, h = held(b, who, t);
+    if (h) { const k = fbKnown(b, who, t).filter((x) => x.f.rev === h.n && x.f.origin === 'MSC').pop(); if (k && k.f.review === 'PENDING') return { c: 'warn', txt: 'Review pending' }; }
+    return r.status === 'DRAFT' ? { c: 'dec', txt: 'Draft' } : { c: 'acc', txt: 'Final' };
+  }
+
+  function revDiff(b, n) {
+    if (n <= 1) return [];
+    const a = b.revs[n - 2].full, c = b.revs[n - 1].full, out = [];
+    if (a.status !== c.status) out.push('declarationStatus');
+    const names = { un: 'UNNumber', psn: 'properShippingName', tech: 'technicalName', cls: 'IMOClass', sub: 'subsidiaryRisks', pg: 'packingGroup', ems: 'EMSNumber', gross: 'grossWeight' };
+    for (const k in names) if (JSON.stringify(a.g[k]) !== JSON.stringify(c.g[k])) out.push(names[k]);
+    if (JSON.stringify(a.docs) !== JSON.stringify(c.docs)) out.push('documentStatus');
+    return out;
+  }
+
+  // ======================================================================= alerts, moments and the guided tour (derived from the built scenario)
+  const ALL5 = (t) => ({ SHP: t, FWD: t, MSC: t, ECT: t, HM: t });
+  const firstTo = (b, p, pred = () => true) => { const m = byBox[b].find((x) => x.to === p && pred(x)); return m ? m.t : null; };
+  function buildAlerts() {
+    const W = BOX.W, L = BOX.L, H = BOX.H;
+    const wEct = W.revs[1].ectAt;
+    const l1 = L.revs[0].mscReview, l2 = L.revs[1].mscReview;
+    const onR3 = (t) => involved.H.filter((p) => { const h = held(H, p, t); return h && h.n === 3; }).length;
+    ALERTS = [
+      { t: wEct, sev: 'warn', box: 'W', title: 'Withdrawn', text: 'Booking cancelled. Veldmeer withdrew the declaration as r2 and ECT Delta took it out of the plan.', who: { SHP: W.revs[1].t, FWD: W.revs[1].t, MSC: W.revs[1].mscAt, ECT: wEct } },
+      { t: T(1, 12, 0), sev: 'warn', box: 'L', title: 'Declaration requested', text: 'No DGD for the battery booking two days before the cut-off, so MSC sent a DGD request.', who: { MSC: T(1, 12, 0), FWD: T(1, 12, 0), SHP: T(1, 12, 0) + RELAY } },
+      { t: EV.acc1, sev: 'good', box: 'H', title: 'Accepted, still DRAFT', text: 'MSC accepted r1. Only Veldmeer can make it FINAL.', who: { MSC: EV.acc1, FWD: EV.acc1, SHP: firstTo('H', 'SHP', (x) => x.fb && x.fb.id === 'H-m1') } },
+      { t: l1.t, sev: 'warn', box: 'L', title: 'Review pending', text: 'The UN 38.3 test summary is referenced as DRAFT.', until: l2.t, who: { MSC: l1.t, FWD: l1.t, SHP: firstTo('L', 'SHP', (x) => x.fb && x.fb.id === l1.id) } },
+      { t: GATE, sev: 'crit', box: 'H', title: 'Gate stop', text: 'Placards show class 3 and 8, r2 declares class 3 only. DG cut-off 18:00.', until: EV.rel, who: { ECT: GATE, MSC: EV.err, FWD: EV.relayErr, SHP: EV.seen } },
+      { t: EV.r3msc, sev: 'good', box: 'H', title: 'r3 at MSC', text: 'UN 2924, class 3 with subsidiary risk 8. A new UN number is a reclassification, so MSC re-checks stowage and segregation before re-approving.', who: { SHP: EV.r3, FWD: EV.r3, MSC: EV.r3msc } },
+      { t: EV.acc3, sev: 'good', box: 'H', title: 'Re-approved by MSC', text: `DG desk re-approved the reclassified booking ${dur(EV.acc3 - EV.r3msc)} after r3 arrived. In practice a misdeclaration fee or a refusal by the terminal is possible; neither is modelled.`, who: { MSC: EV.acc3, FWD: EV.acc3, ECT: EV.acc3, SHP: firstTo('H', 'SHP', (x) => x.fb && x.fb.id === 'H-m3') } },
+      EV.made
+        ? { t: EV.rel, sev: 'good', box: 'H', title: 'Released', text: `${onR3(EV.rel)} of ${involved.H.length} parties hold r3. Into the DG yard ${dur(CUTOFF - EV.rel)} before the cut-off.`, who: ALL5(EV.rel) }
+        : { t: EV.rel, sev: 'crit', box: 'H', title: 'Missed the cut-off', text: `Released ${dur(EV.rel - CUTOFF)} after the 18:00 cut-off. The box waits for next week's sailing.`, who: ALL5(EV.rel) },
+      { t: T(4, 1, 30), sev: '', box: null, title: 'MSC Gülsün alongside', text: 'Loading starts at ECT Delta. ETD Tue 11:54.', who: { MSC: T(4, 1, 30), ECT: T(4, 1, 30), HM: T(4, 1, 30) } },
+      EV.made
+        ? { t: T(5, 5, 10), sev: 'good', box: 'H', title: 'Loaded', text: 'MSCU 482901 7 is on MSC Gülsün.', who: ALL5(T(5, 5, 10)) }
+        : { t: T(5, 11, 54), sev: 'crit', box: 'H', title: 'Sailed without it', text: 'MSC Gülsün left at 11:54. MSCU 482901 7 is still in the DG yard.', who: ALL5(T(5, 11, 54)) },
+    ];
+    if (EV.dup) { const d = EV.dup, b = BOX[d.box]; ALERTS.push({ t: d.t, sev: '', box: d.box, title: 'Duplicate dropped', text: `ECT Delta's ${hhmm(d.t)} query overlapped the previous one by ${OVL_D} min and returned r${d.rev} again. Same reference and revision, so it keeps one copy.`, who: { ECT: d.t } }); }
+    ALERTS.sort((a, b) => a.t - b.t);
+  }
+  function buildMoments() {
+    const W = BOX.W, L = BOX.L;
+    MOMENTS = [
+      { t: EV.req + 1, label: 'MSC asks for the DGD', view: 'chain', sel: 'H', lens: 'ALL' },
+      { t: EV.r1 + RELAY + 1, label: 'Draft via Haventrek', view: 'chain', sel: 'H', lens: 'ALL' },
+      { t: EV.acc1 + 1, label: 'Accepted, still DRAFT', view: 'doc', sel: 'H', lens: 'MSC' },
+      { t: W.revs[1].ectAt + 1, label: 'Withdrawn', view: 'chain', sel: 'W', lens: 'ALL' },
+      { t: EV.r2 + RELAY + 1, label: 'Final issued', view: 'chain', sel: 'H', lens: 'ALL' },
+      { t: L.revs[0].mscReview.t + 1, label: 'Battery summary pending', view: 'doc', sel: 'L', lens: 'MSC' },
+      { t: GATE + 1, label: 'Gate stop', view: 'box', sel: 'H', lens: 'ECT' },
+      { t: EV.err + 2, label: 'One field flagged', view: 'doc', sel: 'H', lens: 'MSC' },
+      { t: EV.r3 + RELAY + 1, label: 'r3 issued', view: 'chain', sel: 'H', lens: 'ALL' },
+      { t: EV.rel + 1, label: EV.made ? 'Released' : 'Missed the cut-off', view: 'box', sel: 'H', lens: 'ECT' },
+      EV.made ? { t: T(5, 5, 11), label: 'Loaded', view: 'chain', sel: 'H', lens: 'ALL' } : { t: T(5, 11, 55), label: 'Sailed without it', view: 'chain', sel: 'H', lens: 'ALL' },
+    ];
+    if (EV.dup) MOMENTS.push({ t: EV.dup.t + 1, label: 'Duplicate dropped', view: 'chain', sel: EV.dup.box, lens: 'ECT' });
+    MOMENTS.sort((a, b) => a.t - b.t);
+  }
+  function buildSteps() {
+    const tm = (t) => `<b>${dayName(t)} ${hhmm(t)}</b>`;
+    STEPS = [
+      { t: EV.req + 1, view: 'chain', lens: 'ALL', text: `<b>Follow MSCU 482901 7</b>, a box of industrial cleaner booked on MSC Gülsün. ${tm(EV.req)} · MSC asks the forwarder, Haventrek, for its dangerous goods declaration. Haventrek passes the request to the shipper, Veldmeer. This is how the exchange would run on DGD 1.0; today most of it is email, PDFs and EDI.` },
+      { t: EV.r1 + RELAY + 1, view: 'chain', lens: 'ALL', text: `${tm(EV.r1)} · Veldmeer issues revision 1 as a DRAFT. Haventrek forwards it to MSC unchanged: same declaration reference, same revision, one forwarding event added.` },
+      { t: EV.acc1 + 1, view: 'doc', lens: 'MSC', text: `${tm(EV.acc1)} · MSC accepts r1. That is MSC's review result, so the declaration stays DRAFT until Veldmeer finalizes it. This is MSC's copy.` },
+      { t: EV.allR2 + 1, view: 'chain', lens: 'ALL', text: `${tm(EV.r2)} · Veldmeer issues r2 as FINAL. MSC pushes it to the Harbour Master and ECT Delta pulls it on its ${params.ectPoll} minute poll. By ${hhmm(EV.allR2)} all five parties hold r2.` },
+      { t: GATE + 1, view: 'box', lens: 'ECT', text: `${tm(GATE)} · At the ECT Delta gate the placards show class 3 and class 8. ECT Delta's copy says UN 1993, class 3 only. The box is held.` },
+      { t: EV.err + 1, view: 'doc', lens: 'ECT', text: `${tm(EV.err)} · ECT Delta rejects r2 and points at the exact field: <span class="mono">/dangerousGoods/0/subsidiaryRisks</span>. Not a generic rejection, a pointer into one revision.` },
+      { t: EV.seen + 1, view: 'chain', lens: 'ALL', text: `${tm(EV.seen)} · The same feedback item travels up: ECT Delta to MSC, MSC to Haventrek, and Veldmeer picks it up on its ${params.shpPoll} minute poll. Same feedback ID, ECT Delta stays the originator.` },
+      { t: EV.r3 + RELAY + 1, view: 'doc', lens: 'ALL', text: `${tm(EV.r3)} · Veldmeer issues r3: UN 2924, class 3 with subsidiary risk 8. Five fields change under the same declaration reference. A new UN number is a reclassification, so MSC's DG desk re-checks stowage and segregation before re-approving.` },
+      { t: EV.ect3 - 1, view: 'chain', lens: 'ECT', text: `${tm(EV.ect3 - 1)} · The fix exists, yet ECT Delta still holds r2: it only sees r3 on its next poll at ${hhmm(EV.ect3)}. This is ECT Delta's view.` },
+      { t: EV.rel + 1, view: 'box', lens: 'ECT', text: EV.made ? `${tm(EV.rel)} · MSC re-approved at ${hhmm(EV.acc3)} and ECT Delta's copy matches the placards. The box is released into the DG yard ${dur(CUTOFF - EV.rel)} before the 18:00 cut-off.` : `${tm(EV.rel)} · MSC re-approved at ${hhmm(EV.acc3)} and ECT Delta's copy matches the placards, ${dur(EV.rel - CUTOFF)} after the 18:00 cut-off. The box waits for next week's sailing.` },
+      { t: EV.rel + 1, view: 'chain', lens: 'ALL', end: true, text: `<b>Your turn.</b> Switch to a party's view at the top, tap any message for its payload, or change the What if settings and replay the gate stop.` },
+    ];
+  }
+
+  build();
+
+  // ======================================================================= state
+  const state = { t: T_START, playing: false, speed: 10, sel: 'H', lens: 'ALL', view: 'chain', openRow: null, cardOpen: true };
+  const stage = $('stage'), wires = $('wires'), desks = $('desks'), card = $('card'), brand = $('brand'), views = $('views');
+  const SVGNS = 'http://www.w3.org/2000/svg';
+  let uiDirty = true;
+  const isPhone = () => window.innerWidth < 900;
+
+  // ======================================================================= JSON payloads (trimmed)
+  function forwardingEvents(b, n, upto, recipient) {
+    const ev = [];
+    for (const m of byBox[b.id]) {
+      if (m.t > upto) break;
+      if (m.k === 'D' && m.rev === n && (m.relay || (m.from === 'MSC' && (m.to === recipient)))) {
+        if (m.from === 'MSC' && m.to !== recipient) continue;
+        ev.push({ forwarder: { partyName: pName(m.from, b) }, recipient: { partyName: pName(m.to, b) }, forwardedAt: iso(m.t) });
+      }
+    }
+    return ev;
+  }
+  function declJSON(b, n, upto, recipient) {
+    const r = b.revs[n - 1], g = r.full.g;
+    const dg = { lineReference: b.line, equipmentReference: b.eq, UNNumber: g.un, properShippingName: g.psn };
+    if (g.tech) dg.technicalName = g.tech;
+    dg.IMOClass = g.cls;
+    if (g.sub && g.sub.length) dg.subsidiaryRisks = g.sub;
+    if (g.pg) dg.packingGroup = g.pg;
+    if (g.ems) dg.EMSNumber = g.ems;
+    const sh = SHIPPER[b.shp];
+    dg.emergencyContactDetails = { contact: '24 h emergency line', provider: sh.name, email: `emergency@${sh.short.toLowerCase()}.example` };
+    dg.outerPackagings = [{ quantity: g.pkg[0], IMOPackagingCode: g.pkg[1], description: g.pkg[2] }];
+    dg.weights = { grossWeight: { value: g.gross, unit: 'KGM' } };
+    const ute = { equipmentReference: b.eq, ISOEquipmentCode: b.iso, tareWeight: { value: b.tare, unit: 'KGM' }, totalGrossWeight: { value: b.tare + g.gross, unit: 'KGM' }, seals: [{ number: `${b.shp}${b.eq.slice(5, 10)}` }] };
+    if (b.fum) ute.fumigation = { ...b.fum, fumigationDateTime: iso(b.fum.fumigationDateTime) };
+    const ex = { declarationStatus: r.full.status };
+    if (b.req) ex.requestCorrelation = b.req;
+    ex.submissionOriginator = { partyName: SHIPPER[b.shp].name };
+    ex.submissionDestination = { partyName: 'MSC' };
+    const fe = forwardingEvents(b, n, upto, recipient);
+    if (fe.length) ex.forwardingEvents = fe;
+    if (r.full.docs.length) ex.documentReferences = r.full.docs.map((d) => ({ documentWebURL: d.url, documentRole: d.role, documentStatus: d.status }));
+    const cert = (statement, date) => ({ declarationStatement: statement, companyName: sh.name, declarantName: 'Dangerous goods officer', signature: 'DG OFFICER', declarationDate: isoDate(date), declarationPlace: { locationName: sh.site } });
+    return {
+      declarationReference: b.ref, issueDate: isoDate(b.revs[0].t),
+      resourceMetadata: { revisionNumber: n, issuedDateTime: iso(r.t) },
+      regulations: [{ code: 'IMD', edition: '42-24' }],
+      parties: [
+        { party: { partyFunction: 'CZ' }, partyName: sh.name, address: { city: sh.site, countryCode: 'NL' } },
+        { party: { partyFunction: 'CN' }, partyName: `${sh.short} Asia Pte Ltd`, address: { city: 'Singapore', countryCode: 'SG' } },
+      ],
+      transport: { modeOfTransport: 'VESSEL', vesselName: VESSEL, voyageNumber: VOY, portOfLoading: { UNLocationCode: 'NLRTM' }, portOfDischarge: { UNLocationCode: 'SGSIN' }, destination: { UNLocationCode: 'SGSIN' } },
+      utilizedTransportEquipments: [ute],
+      dangerousGoods: [dg],
+      shipmentBinding: { carrierBookingReference: b.bkg },
+      certificates: {
+        shipperDeclaration: cert('The contents of this consignment are fully and accurately described by the proper shipping name, and are classified, packaged, marked and labelled or placarded according to the applicable regulations.', r.t),
+        containerPackingCertificates: [{ ...cert('The goods described have been packed into the identified container in accordance with the applicable dangerous goods provisions.', b.revs[0].t), equipmentReferences: [b.eq] }],
+      },
+      exchange: ex,
+    };
+  }
+  function fbJSON(f) {
+    const b = BOX[f.box];
+    const o = { feedbackID: f.uuid, feedbackDateTime: iso(f.t), originatingParty: { partyName: pName(f.origin, b) }, severity: f.sev, code: f.code, message: f.msg, declarationReference: b.ref, revisionNumber: f.rev };
+    if (f.line) o.lineReference = f.line;
+    o.declarationReviewStatus = f.review;
+    if (f.path) o.propertyPath = f.path;
+    return o;
+  }
+  function reqJSON(b, m) {
+    const first = byBox[b.id].find((x) => x.k === 'R');
+    return { requestID: b.req, requester: { partyName: 'MSC' }, intendedProducerOrForwarder: { partyName: 'Haventrek Logistics' }, requestDateTime: iso(first.t), shipmentBinding: { carrierBookingReference: b.bkg } };
+  }
+  function payload(m) {
+    const b = BOX[m.box];
+    const from = pName(m.from, b), to = pName(m.to, b);
+    let title, req, body, meta;
+    if (m.k === 'R') {
+      title = 'DGD request';
+      req = `POST /dgd-requests\nAPI-Version: 1.0.0\n→ 200 OK · DGDFeedbacks: []`;
+      body = { DGDRequests: [reqJSON(b, m)] };
+      meta = m.relay ? `<b>${esc(from)}</b> passes MSC's request on to <b>${esc(to)}</b>, same request ID.` : `<b>${esc(from)}</b> asks <b>${esc(to)}</b> for the declaration. No declaration reference yet, only the booking.`;
+    } else if (m.k === 'D') {
+      const r = b.revs[m.rev - 1];
+      title = `r${m.rev} ${r.status}`;
+      const decl = declJSON(b, m.rev, m.t, m.to);
+      if (m.pull) {
+        req = `GET /dgds?carrierBookingReference=${b.bkg}&issuedDateTimeMin=${encodeURIComponent(iso(m.qmin))}\nAPI-Version: 1.0.0\n→ 200 OK · 1 declaration`;
+        body = { DGDeclarations: [decl] };
+        meta = m.dup ? `<b>${esc(to)}</b>'s ${hhmm(m.t)} poll asks for revisions issued since ${hhmm(m.qmin)}, ${OVL_D} min before its previous poll, so r${m.rev} (issued ${hhmm(b.revs[m.rev - 1].t)}) comes back again. Same reference and revision: a duplicate, dropped.` : `<b>${esc(to)}</b> pulls from <b>${esc(from)}</b> on its ${params.ectPoll} minute poll. The window starts ${OVL_D} min before its previous poll so a revision still being relayed is not missed.`;
+      } else {
+        req = `POST /dgds\nAPI-Version: 1.0.0\n→ 200 OK · feedbackElements: []`;
+        body = { DGDeclarations: [decl] };
+        meta = m.relay ? `<b>${esc(from)}</b> forwards to <b>${esc(to)}</b>. Identity and revision unchanged, one forwarding event added.` : m.from === 'SHP' ? `<b>${esc(from)}</b> issues revision ${m.rev} and pushes it to <b>${esc(to)}</b>.` : m.to === 'HM' ? `<b>${esc(from)}</b> reports the accepted FINAL revision to the <b>Harbour Master</b>. Shown as a direct DGD push, as in a port without a community system; in Rotterdam this report goes through Portbase's Notification Dangerous Goods service.` : `<b>${esc(from)}</b> pushes to <b>${esc(to)}</b>.`;
+      }
+    } else {
+      const f = m.fb;
+      title = f.review === 'ACCEPTED' ? `Accepted r${f.rev}` : `${f.sev} on r${f.rev}`;
+      body = { DGDFeedbacks: [fbJSON(f)] };
+      if (m.pull) {
+        req = `GET /dgd-feedbacks?declarationReferences=${b.ref}&feedbackDateTimeMin=${encodeURIComponent(iso(m.qmin))}\nAPI-Version: 1.0.0\n→ 200 OK · 1 feedback item`;
+        meta = m.dup ? `<b>${esc(to)}</b>'s overlapping poll returned this item again. Same feedback ID, so it is dropped.` : `<b>${esc(to)}</b> pulls feedback from <b>${esc(from)}</b> on its ${params.shpPoll} minute poll. Originator ${esc(pName(f.origin, b))}, same feedback ID.`;
+      } else {
+        req = `POST /dgd-feedbacks\nAPI-Version: 1.0.0\n→ 200 OK`;
+        meta = m.relay ? `<b>${esc(from)}</b> relays <b>${esc(pName(f.origin, b))}</b>'s feedback to <b>${esc(to)}</b>, same feedback ID and originator.` : `<b>${esc(from)}</b> sends feedback to <b>${esc(to)}</b>.`;
+      }
+    }
+    return { title, req, body, meta, sub: `${b.eqF} · ${pShort(m.from, b)} → ${pShort(m.to, b)} · ${dateLabel(m.t)} ${hhmm(m.t)}` };
+  }
+  function hl(json) {
+    return esc(json).replace(/(&quot;(?:[^&]|&(?!quot;))*?&quot;)(\s*:)?|\b(true|false|null)\b|-?\b\d+(?:\.\d+)?\b/g, (m, s, colon, bo) => {
+      if (s) return colon ? `<span class="k">${s}</span>${colon}` : `<span class="s">${s}</span>`;
+      if (bo) return `<span class="b">${m}</span>`;
+      return `<span class="n">${m}</span>`;
+    });
+  }
+  let jsonText = '';
+  function openJSON(o) {
+    $('json-title').textContent = o.title;
+    $('json-sub').textContent = o.sub;
+    $('json-meta').innerHTML = o.meta || '';
+    $('json-req').textContent = o.req || '';
+    $('json-req').hidden = !o.req;
+    jsonText = JSON.stringify(o.body, null, 2);
+    $('json-pre').innerHTML = hl(jsonText);
+    $('json').hidden = false;
+  }
+  const openMsg = (id) => openJSON(payload(MSG[id]));
+  $('json-close').onclick = () => { $('json').hidden = true; };
+  $('json-copy').onclick = async () => { try { await navigator.clipboard.writeText(jsonText); $('json-copy').textContent = 'Copied'; setTimeout(() => { $('json-copy').textContent = 'Copy'; }, 1200); } catch (e) { $('json-copy').textContent = 'Copy failed'; } };
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') $('json').hidden = true; });
+
+  // ======================================================================= layout
+  function geom() {
+    const sr = stage.getBoundingClientRect();
+    const W = sr.width, H = sr.height, phone = isPhone();
+    const br = brand.getBoundingClientRect(), vr = views.getBoundingClientRect();
+    let x0 = 16, x1 = W - 16;
+    if (!phone && !card.hidden) { const cr = card.getBoundingClientRect(); x0 = Math.max(x0, cr.right - sr.left + 16); }
+    const brandBottom = br.bottom - sr.top, brandRight = br.right - sr.left, viewsBottom = vr.bottom - sr.top, viewsLeft = vr.left - sr.left;
+    const gEl2 = document.getElementById('guide');
+    const gh = gEl2 && !gEl2.hidden && !gEl2.classList.contains('float') ? gEl2.offsetHeight + (phone ? 66 : 24) : 0;
+    return { W, H, x0, x1, brandBottom, brandRight, viewsBottom, viewsLeft, phone, gh, cardTop: card.hidden || phone ? H : card.getBoundingClientRect().top - sr.top };
+  }
+  let G = null;
+  function chainGeom() {
+    const g = geom();
+    const n = 5, gap = g.phone ? 6 : 12;
+    const deskW = Math.min(172, (g.x1 - g.x0 - gap * (n - 1)) / n);
+    const compact = deskW < 124;
+    const deskH = compact ? 78 : 128;
+    const span = deskW * n + gap * (n - 1);
+    const x0 = g.x0 + Math.max(0, (g.x1 - g.x0 - span) / 2);
+    let top;
+    if (g.phone) top = Math.max(g.brandBottom + 34, 0);
+    else if (x0 < g.brandRight + 8) top = g.brandBottom + 56;
+    else top = Math.max(g.viewsBottom + 62, g.H * 0.2);
+    const laneTop = top + deskH + (compact ? 56 : 74);
+    const usable = g.H - g.gh;
+    const laneY = Math.min(usable - (compact ? 40 : 52), laneTop + Math.max(40, (usable - laneTop) * 0.42));
+    const cx = ORDER.map((_, i) => x0 + i * (deskW + gap) + deskW / 2);
+    return { ...g, deskW, deskH, compact, top, cx, laneY, lx0: x0, lx1: x0 + span };
+  }
+
+  // ======================================================================= chain: desks
+  const classBadges = (g, small) => `<i class="dg">${esc(g.cls)}</i>${(g.sub || []).map((s) => `<i class="dg sub">${esc(s)}</i>`).join('')}`;
+  function deskHTML(p, b, t, cg) {
+    const eyebrow0 = p === 'SHP' ? 'Shipper · producer' : p === 'FWD' ? 'Forwarder' : p === 'MSC' ? 'Carrier' : p === 'ECT' ? 'Terminal' : 'Port authority';
+    const name0 = cg.compact ? { SHP: 'Shipper', FWD: 'Forwarder', MSC: 'MSC', ECT: 'ECT', HM: 'Harbour' }[p] : pShort(p, b);
+    if (state.lens !== 'ALL' && state.lens !== p) return `<div class="desk masked${cg.compact ? ' compact' : ''}" data-p="${p}" aria-label="${esc(pName(p, b))}, hidden in this view"><div class="eyebrow">${eyebrow0}</div><div class="dn">${esc(name0)}</div><div class="dcopy none"><b>r?</b><span>hidden</span></div><div class="dun">&nbsp;</div><div class="dfb"><span class="t">Not visible to ${esc(state.lens === 'SHP' ? pShort('SHP', b) : PARTY[state.lens].short)}</span></div></div>`;
+    const inv = involved[b.id].includes(p);
+    const h = held(b, p, t);
+    const latest = issuedAt(b, t);
+    const last = lastOf(b, p, t, ['R', 'F', 'A']);
+    const err = openError(b, p, t);
+    const recent = (h && t - h.at < 15) || (last && t - last.t < 15);
+    const cls = ['desk'];
+    if (cg.compact) cls.push('compact');
+    if (state.lens !== 'ALL' && state.lens !== p) cls.push('dim');
+    if (!inv) cls.push('dim');
+    if (state.lens === p) cls.push('lens');
+    if (err) cls.push('err');
+    if (state.lens === 'ALL' && h && latest && h.n < latest.n) cls.push('behind');
+    if (recent) cls.push('fresh');
+    const eyebrow = p === 'SHP' ? 'Shipper · producer' : p === 'FWD' ? 'Forwarder' : p === 'MSC' ? 'Carrier' : p === 'ECT' ? 'Terminal' : 'Port authority';
+    let copy;
+    if (h) copy = `<div class="dcopy"><b>r${h.n}${h.copies > 1 ? `<sup>×${h.copies}</sup>` : ''}</b><span>${h.rev.status}</span></div><div class="dun">UN ${esc(h.rev.full.g.un)} ${classBadges(h.rev.full.g)}</div>`;
+    else copy = `<div class="dcopy none"><b>r–</b><span>${inv ? 'no copy yet' : 'not in chain'}</span></div><div class="dun">&nbsp;</div>`;
+    let foot = p === 'HM' ? '<span class="t">Via Portbase in practice</span>' : '<span class="t">&nbsp;</span>';
+    if (last) {
+      if (last.k === 'R') foot = `<i class="cls R">R</i><span class="t">Request · ${dt2(last.t)}</span>`;
+      else {
+        const f = last.fb, e = f.sev === 'ERROR';
+        const lbl = f.review === 'ACCEPTED' ? `Accepted r${f.rev}` : `${f.sev} r${f.rev}`;
+        foot = `<i class="cls ${last.k}${e ? ' err' : ''}">${last.k}</i><span class="t" title="${esc(f.origin === p ? 'Sent by ' + pShort(p, b) : 'From ' + pShort(f.origin, b))}">${lbl} · ${hhmm(last.t)}</span>`;
+        if (cg.compact) foot = `<i class="cls ${last.k}${e ? ' err' : ''}">${last.k}</i>r${f.rev}`;
+      }
+    }
+    const name = cg.compact ? { SHP: 'Shipper', FWD: 'Forwarder', MSC: 'MSC', ECT: 'ECT', HM: 'Harbour' }[p] : pShort(p, b);
+    return `<div class="${cls.join(' ')}" data-p="${p}" role="button" tabindex="0" aria-label="${esc(pName(p, b))}"><div class="eyebrow">${eyebrow}</div><div class="dn">${esc(name)}</div>${copy}<div class="dfb">${foot}</div></div>`;
+  }
+  let deskKey = '';
+  function renderDesks(cg) {
+    const b = BOX[state.sel];
+    const key = [state.sel, state.lens, Math.floor(state.t), cg.compact, state.view].join('|');
+    if (state.view !== 'chain') { if (deskKey !== 'off') { desks.innerHTML = ''; deskKey = 'off'; } return; }
+    if (key !== deskKey) { desks.innerHTML = ORDER.map((p) => deskHTML(p, b, state.t, cg)).join(''); deskKey = key; }
+    ORDER.forEach((p, i) => {
+      const el = desks.children[i]; if (!el) return;
+      el.style.width = cg.deskW + 'px';
+      el.style.left = (cg.cx[i] - cg.deskW / 2) + 'px';
+      el.style.top = cg.top + 'px';
+    });
+  }
+  desks.addEventListener('click', (e) => { const d = e.target.closest('.desk'); if (!d) return; const p = d.dataset.p; if (['SHP', 'MSC', 'ECT'].includes(p)) setLens(state.lens === p ? 'ALL' : p); });
+
+  // ======================================================================= chain: wires, tokens, lane
+  function arcPts(cg, i, j) {
+    const right = j > i, k = Math.abs(j - i);
+    const yTop = cg.top, yBot = cg.top + (desks.children[i] ? desks.children[i].offsetHeight : cg.deskH);
+    const sx = cg.cx[i] + (right ? 12 : -12), ex = cg.cx[j] + (right ? -12 : 12);
+    if (right) return [sx, yTop - 2, (sx + ex) / 2, yTop - 30 - 18 * k, ex, yTop - 2];
+    return [sx, yBot + 2, (sx + ex) / 2, yBot + 30 + 18 * k, ex, yBot + 2];
+  }
+  const qpt = (a, u) => { const v = 1 - u; return [v * v * a[0] + 2 * v * u * a[2] + u * u * a[4], v * v * a[1] + 2 * v * u * a[3] + u * u * a[5]]; };
+  const tokColor = (m) => m.k + (m.fb && m.fb.sev === 'ERROR' ? ' err' : '');
+  function lanePos(cg) {
+    const x0 = cg.lx0, x1 = cg.lx1, w = x1 - x0;
+    if (cg.compact) return { plant: x0 + 18, gate: x0 + w * 0.46, yard: x0 + w * 0.64, quay: x1 - w * 0.18, ship: x1 - 34 };
+    return { plant: x0 + Math.min(40, w * 0.06), gate: x0 + w * 0.56, yard: x0 + w * 0.68, quay: x1 - Math.min(170, w * 0.24), ship: x1 - Math.min(70, w * 0.1) };
+  }
+  function boxPos(b, t, L, cg, slotY) {
+    const ph = physAt(b, t);
+    const i = BOXES.indexOf(b);
+    if (ph.s === 'plant') return { x: L.plant + (i % 3) * 12 - 8, y: cg.laneY - 12, s: ph.s, at: ph.at };
+    if (ph.s === 'road') { const nx = b.phys.find((p) => p[0] > t); const end = nx ? nx[0] : t + 60; const u = clamp((t - ph.at) / (end - ph.at), 0, 1); return { x: lerp(L.plant + 26, L.gate - 26, u), y: cg.laneY - 12, s: ph.s, at: ph.at }; }
+    if (ph.s === 'held' || ph.s === 'gate') return { x: L.gate, y: cg.laneY - 12, s: ph.s, at: ph.at };
+    if (ph.s === 'yard' || ph.s === 'rolled') { const k = slotY.n++; const dx = cg.compact ? 22 : 32, dy = cg.compact ? 12 : 16; return { x: L.yard + (k % 3) * dx - 8, y: cg.laneY - 12 - Math.floor(k / 3) * dy, s: ph.s, at: ph.at }; }
+    if (ph.s === 'quay') return { x: L.quay, y: cg.laneY - 12, s: ph.s, at: ph.at };
+    if (ph.s === 'aboard') { const k = slotY.a++; return { x: L.ship - 30 + (k % 5) * 12, y: cg.laneY - 40 - Math.floor(k / 5) * 7, s: ph.s, at: ph.at, aboard: true }; }
+    return null;
+  }
+  function placardSVG(x, y, txt, s) {
+    if (txt === 'FUM') return `<rect x="${x - s * 1.1}" y="${y - s * 0.6}" width="${s * 2.2}" height="${s * 1.2}" class="pl"/><text x="${x}" y="${y + 0.5}" class="plt" style="font-size:${s * 0.55}px">FUM</text>`;
+    return `<path d="M${x} ${y - s}L${x + s} ${y}L${x} ${y + s}L${x - s} ${y}Z" class="pl"/><text x="${x}" y="${y + 0.5}" class="plt" style="font-size:${s * 0.95}px">${txt}</text>`;
+  }
+  function drawWires() {
+    if (state.view !== 'chain') { wires.innerHTML = ''; if (deskKey !== 'off') { desks.innerHTML = ''; deskKey = 'off'; } return; }
+    const cg = G = chainGeom();
+    renderDesks(cg);
+    const t = state.t, b = BOX[state.sel];
+    const parts = [];
+    const idx = (p) => ORDER.indexOf(p);
+    // base arcs for the selected box's routes
+    const routes = new Set();
+    for (const m of byBox[b.id]) routes.add(m.from + '>' + m.to);
+    for (const r of routes) { const [f, to] = r.split('>'); const a = arcPts(cg, idx(f), idx(to)); parts.push(`<path class="arc used" d="M${a[0]} ${a[1]}Q${a[2]} ${a[3]} ${a[4]} ${a[5]}"/>`); }
+    // pull probes (only at readable speeds)
+    const spd = effSpeed();
+    if (spd <= 30) {
+      const pd = Math.max(1.5, spd * 0.75);
+      const pollers = [];
+      if (state.lens === 'ALL' || state.lens === 'ECT') pollers.push(['ECT', 'MSC', params.ectPoll]);
+      if (b.via && (state.lens === 'ALL' || state.lens === 'SHP')) pollers.push(['SHP', 'FWD', params.shpPoll]);
+      for (const [rq, pv, P] of pollers) {
+        const tp = Math.floor(t / P) * P; const u = (t - tp) / pd;
+        if (u >= 0 && u <= 1 && tp > 0) {
+          const a = arcPts(cg, idx(rq), idx(pv));
+          const pts = []; for (let k = 0; k <= 12; k++) pts.push(qpt(a, (k / 12) * u));
+          const [x, y] = qpt(a, u);
+          parts.push(`<path class="probe" d="M${pts.map((p) => p.join(' ')).join('L')}" opacity="${(1 - u * 0.6).toFixed(2)}"/><circle class="probe-dot" cx="${x}" cy="${y}" r="4"/>`);
+          if (!cg.compact) parts.push(`<text class="probe-t" x="${a[0] + (a[4] > a[0] ? 4 : -40)}" y="${a[1] + (a[3] > a[1] ? 16 : -8)}">${rq === 'ECT' ? 'GET /dgds' : 'GET /dgd-feedbacks'}</text>`);
+        }
+      }
+    }
+    // tokens in flight
+    const fd = Math.max(2, spd * 1.15);
+    const lo = countTo(t - fd), hi = countTo(t);
+    let newest = -1; for (let k = lo; k < hi; k++) if (MSGS[k].box === state.sel && (state.lens === 'ALL' || knows(MSGS[k], state.lens))) newest = k;
+    for (let k = lo; k < hi; k++) {
+      const m = MSGS[k]; const u = (t - m.t) / fd; if (u < 0 || u > 1) continue;
+      if (state.lens !== 'ALL' && !knows(m, state.lens)) continue;
+      const mb = BOX[m.box]; const own = m.box === state.sel;
+      if (!own && cg.compact) continue;
+      const a = arcPts(cg, idx(m.from), idx(m.to));
+      const e = u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2;
+      const [x, y] = qpt(a, e);
+      const s = own ? 18 : 12;
+      const right = a[4] > a[0];
+      const lbl = m.k === 'R' ? 'request' : m.k === 'D' ? `r${m.rev}${m.dup ? ' again' : ''}` : m.fb.review === 'ACCEPTED' ? `ACCEPTED r${m.rev}` : `${m.fb.sev} r${m.rev}`;
+      parts.push(`<g class="tok ${tokColor(m)}${own ? '' : ' bg'}" transform="translate(${x.toFixed(1)} ${y.toFixed(1)})"><rect x="${-s / 2}" y="${-s / 2}" width="${s}" height="${s}"/><text class="l" ${own ? '' : 'style="font-size:8px"'}>${m.k}</text>${k === newest && !cg.compact ? `<text class="c" x="${s / 2 + 5}" y="${right ? -4 : 12}">${esc(m.op.split(' ')[0])} ${esc(m.op.split(' ')[1])} · ${lbl}</text>` : ''}</g>`);
+    }
+    // physical lane
+    const L = lanePos(cg), ly = cg.laneY;
+    parts.push(`<line class="lane-road" x1="${L.plant}" y1="${ly}" x2="${L.gate - 18}" y2="${ly}"/><line class="lane" x1="${L.gate - 18}" y1="${ly}" x2="${L.quay + 20}" y2="${ly}"/>`);
+    const labs = cg.compact ? [[L.plant + 6, 'Shipper'], [(L.plant + L.gate) / 2, 'Road'], [L.gate, 'Gate'], [L.yard + 18, 'Yard']] : [[L.plant, 'Shipper sites'], [(L.plant + L.gate) / 2, 'Road'], [L.gate, 'Gate'], [L.yard + 18, 'DG yard'], [L.quay, 'Quay']];
+    for (const [x, s] of labs) parts.push(`<text class="st-l" x="${x}" y="${ly + 18}">${s}</text>`);
+    // gate arch
+    parts.push(`<path class="gate-arch" d="M${L.gate - 40} ${ly}V${ly - 44}H${L.gate + 40}V${ly}"/><rect class="gate-cam" x="${L.gate - 5}" y="${ly - 51}" width="10" height="7" rx="1"/>`);
+    // ship
+    const vs = t < T(4, 1, 30) ? 'exp' : t < T(5, 11, 54) ? 'along' : 'gone';
+    if (vs !== 'gone') {
+      const sx = L.ship, op = vs === 'exp' ? 0.45 : 1;
+      const stacks = []; for (let k = 0; k < 9; k++) stacks.push(`<rect class="c" x="${sx - 50 + k * 11}" y="${ly - 32 - (k % 3) * 4}" width="10" height="${16 + (k % 3) * 4}" fill="${['#5B7F9C', '#B8794A', '#93504B', '#8A9494', '#6A8A6C', '#3D5463', '#BFA766', '#5B7F9C', '#93504B'][k]}"/>`);
+      parts.push(`<g class="ship" opacity="${op}"${cg.compact ? ` transform="translate(${sx} ${ly}) scale(.6) translate(${-sx} ${-ly})"` : ''}>${stacks.join('')}<rect x="${sx + 40}" y="${ly - 44}" width="9" height="28" rx="1" fill="var(--crane)" stroke="var(--g-cargo)" stroke-width=".8"/><path class="h" d="M${sx - 64} ${ly - 16}H${sx + 60}L${sx + 50} ${ly + 2}H${sx - 58}Z"/><text x="${sx}" y="${ly + 18}">MSC Gülsün</text><text class="s" x="${sx}" y="${ly + 30}">${vs === 'exp' ? 'Expected Mon 01:30' : 'Alongside · ETD Tue 11:54'}</text></g>`);
+    } else parts.push(`<text class="st-l" x="${L.ship}" y="${ly + 18}">Sailed 11:54</text>`);
+    // boxes
+    const slot = { n: 0, a: 0 };
+    const ordered = [...BOXES].sort((a, c) => (a.id === state.sel) - (c.id === state.sel));
+    const placed = [];
+    for (const bx of BOXES) { const p = boxPos(bx, t, L, cg, slot); if (p) placed.push([bx, p]); }
+    placed.sort((a, c) => (a[0].id === state.sel) - (c[0].id === state.sel));
+    for (const [bx, p] of placed) {
+      const sel = bx.id === state.sel; const hero = bx.id === 'H';
+      if (p.aboard && !sel) { parts.push(`<g class="cbox"><rect class="b" x="${p.x - 5}" y="${p.y}" width="10" height="5" rx="1"/></g>`); continue; }
+      const w = sel ? (cg.compact ? 54 : 64) : (cg.compact ? 20 : 30), h = sel ? (cg.compact ? 22 : 26) : (cg.compact ? 10 : 14);
+      const y = p.y - (sel ? 8 : 0);
+      let g = `<g class="cbox${hero ? ' hero' : ''}${sel ? ' sel' : ''}" data-box="${bx.id}"><rect class="b" x="${p.x - w / 2}" y="${y - h / 2}" width="${w}" height="${h}" rx="2"/>`;
+      if (sel) {
+        bx.placards.forEach((pl, k) => { g += placardSVG(p.x + (k - (bx.placards.length - 1) / 2) * 22, y, pl, 9); });
+        if (!p.aboard) {
+          const st = p.s === 'held' ? 'HELD' : p.s === 'rolled' ? 'ROLLED' : p.s === 'road' ? 'On the road' : p.s === 'plant' ? SHIPPER[bx.shp].site : p.s === 'quay' ? 'Loading' : p.s === 'yard' || p.s === 'gate' ? 'DG yard' : '';
+          const ty = p.s === 'held' || p.s === 'gate' ? cg.laneY - 62 : y - h / 2 - 8;
+          g += `<text class="n" x="${p.x}" y="${ty - 12}">${bx.eqF}</text><text class="s${p.s === 'held' || p.s === 'rolled' ? ' crit' : ''}" x="${p.x}" y="${ty}">${st}</text>`;
+        }
+        if (p.s === 'held') {
+          const pulse = 1 + 0.12 * Math.sin(performance.now() / 260);
+          g += `<ellipse class="ring" cx="${p.x}" cy="${y}" rx="${44 * pulse}" ry="${24 * pulse}"/>`;
+        }
+      }
+      g += '</g>';
+      parts.push(g);
+      if (sel && p.s === 'held' && desks.children[3]) {
+        const ex = cg.cx[3], ey = cg.top + desks.children[3].offsetHeight + 2;
+        parts.push(`<path class="tie" d="M${p.x} ${cg.laneY - 88}C${p.x} ${(y + ey) / 2} ${ex} ${(y + ey) / 2} ${ex} ${ey + 4}"/>`);
+      }
+    }
+    // gate scan beam while the selected box is at the gate
+    const sp = placed.find(([bx]) => bx.id === state.sel);
+    if (sp && (sp[1].s === 'held' || sp[1].s === 'gate') && t - sp[1].at < 25) parts.unshift(`<path class="scan" d="M${L.gate - 3} ${ly - 44}L${L.gate - 38} ${ly}H${L.gate + 38}L${L.gate + 3} ${ly - 44}Z"/>`);
+    wires.innerHTML = parts.join('');
+  }
+  wires.addEventListener('click', (e) => { const g = e.target.closest('.cbox'); if (g && g.dataset.box) select(g.dataset.box); });
+
+  // ======================================================================= document view
+  const lensFor = (forBox) => (state.lens === 'ALL' ? (forBox ? 'ECT' : 'SHP') : state.lens);
+  const fmtV = (v) => (v === undefined || v === null || v === '' || (Array.isArray(v) && !v.length) ? null : Array.isArray(v) ? JSON.stringify(v) : String(v));
+  function docRows(b, r) {
+    const g = r.full.g;
+    const rows = [
+      ['Identity', '/declarationReference', b.ref],
+      ['Identity', '/resourceMetadata/revisionNumber', r.n],
+      ['Identity', '/resourceMetadata/issuedDateTime', iso(r.t)],
+      ['Identity', '/exchange/declarationStatus', r.full.status],
+      ['Shipment', '/shipmentBinding/carrierBookingReference', b.bkg],
+      ['Shipment', '/transport/vesselName', `${VESSEL} · ${VOY}`],
+      ['Shipment', '/utilizedTransportEquipments/0/equipmentReference', b.eq],
+      [`Goods line ${b.line}`, '/dangerousGoods/0/UNNumber', g.un],
+      [`Goods line ${b.line}`, '/dangerousGoods/0/properShippingName', g.psn],
+      [`Goods line ${b.line}`, '/dangerousGoods/0/technicalName', g.tech],
+      [`Goods line ${b.line}`, '/dangerousGoods/0/IMOClass', g.cls],
+      [`Goods line ${b.line}`, '/dangerousGoods/0/subsidiaryRisks', g.sub],
+      [`Goods line ${b.line}`, '/dangerousGoods/0/packingGroup', g.pg],
+      [`Goods line ${b.line}`, '/dangerousGoods/0/EMSNumber', g.ems],
+      [`Goods line ${b.line}`, '/dangerousGoods/0/outerPackagings/0', `${g.pkg[0]} × ${g.pkg[1]} · ${g.pkg[2]}`],
+      [`Goods line ${b.line}`, '/dangerousGoods/0/weights/grossWeight', `${g.gross.toLocaleString('en-GB')} KGM`],
+    ];
+    if (b.fum) rows.push(['Equipment', '/utilizedTransportEquipments/0/fumigation/fumigantName', `${b.fum.fumigantName} · ${b.fum.dosage}`]);
+    if (r.full.docs.length) r.full.docs.forEach((d, k) => { rows.push(['Exchange', `/exchange/documentReferences/${k}/documentRole`, d.role]); rows.push(['Exchange', `/exchange/documentReferences/${k}/documentStatus`, d.status]); });
+    if (b.req) rows.push(['Exchange', '/exchange/requestCorrelation', b.req]);
+    return rows;
+  }
+  let docKey = '';
+  function renderDoc(force) {
+    const pane = $('doc');
+    if (state.view !== 'doc') { pane.hidden = true; docKey = ''; return; }
+    const b = BOX[state.sel], t = state.t, p = lensFor(false);
+    const h = held(b, p, t);
+    const known = h ? fbKnown(b, p, t) : [];
+    const key = [b.id, p, h ? h.n : 0, known.length, isPhone()].join('|');
+    placePane(pane);
+    if (!force && key === docKey) { drawPointers(); return; }
+    docKey = key; pane.hidden = false;
+    const who = state.lens === 'ALL' ? `${pShort('SHP', b)}'s latest issue` : `${pShort(p, b)}'s copy`;
+    const rec = state.lens === 'ALL' ? null : received(b, p, t);
+    const rail = state.lens === 'ALL'
+      ? b.revs.filter((r) => r.t <= t).map((r) => { const holders = ORDER.filter((q) => { const x = held(b, q, t); return x && x.n === r.n; }); return `<span class="${h && h.n === r.n ? 'on' : ''}"><b>r${r.n}</b> ${r.status} <i>· ${holders.length ? holders.length + ' hold' : 'superseded'}</i></span>`; }).join('')
+      : rec.map((x) => `<span class="${h && h.n === x.n ? 'on' : ''}"><b>r${x.n}</b> ${x.rev.status} <i>· ${h && h.n === x.n ? 'current' : 'earlier'}</i></span>`).join('');
+    if (!h) {
+      pane.innerHTML = `<header><div><div class="eyebrow">${esc(b.eqF)} · ${esc(who)}</div><h2>${esc(b.ref)}</h2></div><div class="revrail">${rail}</div></header><div class="doc-empty">${esc(pShort(p, b))} has no copy yet${p === 'ECT' ? `. It pulls GET /dgds every ${params.ectPoll} minutes.` : p === 'HM' ? '. MSC pushes once it has accepted a FINAL revision.' : '.'}</div>`;
+      return;
+    }
+    const r = h.rev;
+    const prevRec = rec ? rec.filter((x) => x.n < r.n).pop() : null;
+    const prev = rec ? (prevRec ? prevRec.rev : null) : r.n > 1 ? b.revs[r.n - 2] : null;
+    const prevRows = prev ? Object.fromEntries(docRows(b, prev).map((x) => [x[1], fmtV(x[2])])) : {};
+    const changed = new Set(prev ? docRows(b, r).filter((x) => !['/resourceMetadata/revisionNumber', '/resourceMetadata/issuedDateTime'].includes(x[1]) && fmtV(x[2]) !== prevRows[x[1]]).map((x) => x[1]) : []);
+    const onRev = known.filter((k) => k.f.rev === r.n);
+    const older = known.filter((k) => k.f.rev < r.n && k.f.sev !== 'INFO');
+    const ptrs = {}; for (const k of onRev) if (k.f.path) ptrs[k.f.path] = k.f.sev === 'ERROR' ? 'err' : 'warn';
+    let sec = '', rowsHtml = '';
+    for (const [s, path, v] of docRows(b, r)) {
+      if (s !== sec) { rowsHtml += `<div class="doc-sec">${esc(s)}</div>`; sec = s; }
+      const fv = fmtV(v);
+      const cl = ['doc-row']; if (changed.has(path)) cl.push('chg'); if (ptrs[path]) cl.push('ptr', ptrs[path] === 'warn' ? 'warn' : '');
+      const old = changed.has(path) ? prevRows[path] : undefined;
+      rowsHtml += `<div class="${cl.join(' ')}" data-path="${esc(path)}"><div class="k">${esc(path)}</div><div class="v${fv ? '' : ' absent'}">${old !== undefined ? `<s>${old === null ? 'absent' : esc(old)}</s>` : ''}${fv ? `<span class="nv">${esc(fv)}</span>` : 'not present'}</div></div>`;
+    }
+    const notes = [...onRev].reverse().map((k) => {
+      const f = k.f, c = f.review === 'ACCEPTED' ? 'ok' : f.sev === 'ERROR' ? 'err' : 'warn';
+      const relayed = k.via && k.via.from !== f.origin;
+      return `<div class="fbn ${c}${relayed ? ' relay' : ''}" data-path="${esc(f.path || '')}" data-sev="${c}"><div class="h">${f.review === 'ACCEPTED' ? 'ACCEPTED' : esc(f.sev)} · ${esc(pShort(f.origin, b))}<span>${dt2(f.t)}</span></div><div class="code">${esc(f.code)} · review ${esc(f.review)}</div><p>${esc(f.msg)}</p>${f.path ? `<div class="path">${esc(f.path)}</div>` : ''}</div>`;
+    });
+    for (const k of older.slice(-1)) notes.push(`<div class="fbn"><div class="h">${esc(k.f.sev)} on r${k.f.rev}<span>${dt2(k.f.t)}</span></div><p>Stays attached to r${k.f.rev}. It does not carry over to r${r.n}.</p></div>`);
+    const nofb = !notes.length;
+    const diffTxt = prev ? (changed.size ? `${changed.size} field${changed.size > 1 ? 's' : ''} changed from r${prev.n}` : `same content as r${prev.n}, new revision`) : rec ? 'first revision received' : 'first revision';
+    pane.innerHTML = `<header><div><div class="eyebrow">${esc(b.eqF)} · ${esc(who)} · ${esc(diffTxt)}</div><h2>${esc(b.ref)} · r${r.n}</h2></div><div class="revrail">${rail}</div></header>
+      <div class="doc-body${nofb ? ' nofb' : ''}"><div class="doc-rows">${rowsHtml}</div>${nofb ? '' : `<div class="doc-fb">${notes.join('')}</div>`}<svg class="doc-ptr" aria-hidden="true"></svg></div>`;
+    pane.classList.toggle('narrow', pane.clientWidth < 700);
+    const bodyEl = pane.querySelector('.doc-body'), pr = pane.querySelector('.doc-row.ptr');
+    if (pr && bodyEl.scrollHeight > bodyEl.clientHeight) { const a = pr.getBoundingClientRect(), c = bodyEl.getBoundingClientRect(); if (a.bottom > c.bottom - 8) bodyEl.scrollTop += a.top - c.top - bodyEl.clientHeight / 2; }
+    const chgs = pane.querySelectorAll('.doc-row.chg');
+    if (!pr && chgs.length && bodyEl.scrollHeight > bodyEl.clientHeight) { const c = bodyEl.getBoundingClientRect(); if (chgs[chgs.length - 1].getBoundingClientRect().bottom > c.bottom - 8) bodyEl.scrollTop += chgs[0].getBoundingClientRect().top - c.top - 30; }
+    drawPointers();
+  }
+  function drawPointers() {
+    const pane = $('doc'); if (pane.hidden) return;
+    const body = pane.querySelector('.doc-body'), svg = pane.querySelector('.doc-ptr'); if (!body || !svg) return;
+    const br = body.getBoundingClientRect();
+    svg.setAttribute('width', body.scrollWidth); svg.setAttribute('height', body.scrollHeight);
+    svg.style.width = body.scrollWidth + 'px'; svg.style.height = body.scrollHeight + 'px';
+    let out = '';
+    for (const n of pane.querySelectorAll('.fbn[data-path]')) {
+      const path = n.dataset.path; if (!path) continue;
+      const row = pane.querySelector(`.doc-row[data-path="${CSS.escape(path)}"]`); if (!row) continue;
+      const a = row.getBoundingClientRect(), c = n.getBoundingClientRect();
+      const x1 = a.right - br.left + body.scrollLeft, y1 = a.top + a.height / 2 - br.top + body.scrollTop;
+      const x2 = c.left - br.left + body.scrollLeft, y2 = c.top + 16 - br.top + body.scrollTop;
+      const w = n.dataset.sev === 'warn' ? ' class="warn"' : '';
+      out += `<path${w} d="M${x2} ${y2}C${x2 - 30} ${y2} ${x1 + 30} ${y1} ${x1} ${y1}"/><circle${w} cx="${x1}" cy="${y1}" r="3.5"/>`;
+    }
+    if (out === ptrOut && svg.childNodes.length) return;
+    ptrOut = out; svg.innerHTML = out;
+  }
+  function placePane(pane) {
+    const g = geom();
+    if (g.phone) { pane.style.left = '12px'; pane.style.right = '12px'; pane.style.width = 'auto'; pane.style.top = (g.brandBottom + 10) + 'px'; pane.style.bottom = (g.gh ? g.gh : 54) + 'px'; return; }
+    const x0 = Math.max(g.x0, card.hidden ? g.brandRight + 14 : g.x0);
+    pane.style.left = x0 + 'px'; pane.style.width = Math.max(320, g.x1 - x0) + 'px'; pane.style.right = 'auto';
+    pane.style.top = (g.viewsBottom + 10) + 'px'; pane.style.bottom = (g.gh ? g.gh : 34) + 'px';
+  }
+
+  // ======================================================================= box view
+  const C30 = Math.cos(Math.PI / 6), S30 = 0.5;
+  let boxKey = '';
+  function renderBox(force) {
+    const pane = $('boxv');
+    if (state.view !== 'box') { pane.hidden = true; boxKey = ''; return; }
+    const b = BOX[state.sel], t = state.t, p = lensFor(true);
+    const h = held(b, p, t);
+    const ph = physAt(b, t);
+    const scanning = (ph.s === 'held' || ph.s === 'gate') && t - ph.at < 40;
+    const key = [b.id, p, h ? h.n : 0, ph.s, scanning, isPhone()].join('|');
+    placePane(pane);
+    if (!force && key === boxKey) return;
+    boxKey = key; pane.hidden = false;
+    const g = h ? h.rev.full.g : null;
+    const onBox = b.placards;
+    const declared = g ? [g.cls, ...(g.sub || [])] : [];
+    const fum = onBox[0] === 'FUM';
+    const match = g && (fum ? !!b.fum : onBox.length === declared.length && onBox.every((x, k) => x === declared[k]));
+    const where = { plant: `At ${SHIPPER[b.shp].site}`, road: 'On the road to ECT Delta', held: 'Held at the ECT Delta gate', gate: 'Gate check at ECT Delta', yard: 'In the DG yard', quay: 'Under the crane', aboard: 'On MSC Gülsün', gone: 'Withdrawn, never left the shipper', rolled: 'In the DG yard, rolled to next week' }[ph.s];
+    const cmp = `<div class="cmp ${!g ? '' : match ? 'good' : 'bad'}"><div><div class="k">On the box</div><div class="v">${fum ? 'Fumigation mark' : onBox.map((x) => `<i class="dg">${x}</i>`).join('')}</div></div><div><div class="k">${esc(pShort(p, b))}'s copy${h ? ` · r${h.n}` : ''}</div><div class="v">${g ? (fum ? 'UN 3359' : declared.map((x, k) => `<i class="dg${k ? ' sub' : ''}">${x}</i>`).join('')) : '<span style="font-size:14px;color:var(--muted)">no copy</span>'}</div></div></div>`;
+    const verdict = !g ? '' : match ? `<div class="verdict good">Placards and declaration agree.</div>` : `<div class="verdict bad">Placards show ${onBox.join(' and ')}, the declaration says ${declared.join(' and ')}.</div>`;
+    const maps = g ? [
+      ['/utilizedTransportEquipments/0', `${b.eqF} · ${b.iso} · tare ${b.tare.toLocaleString('en-GB')} kg`, 'ute'],
+      [`/dangerousGoods/0 · ${b.line}`, `UN ${g.un} ${g.psn.toLowerCase()} · equipmentReference ${b.eq}`, 'dg'],
+      ['/dangerousGoods/0/outerPackagings/0', `${g.pkg[0]} × ${g.pkg[1]} · ${g.pkg[2].toLowerCase()}`, 'pkg'],
+      fum ? ['/utilizedTransportEquipments/0/fumigation', `${b.fum.fumigantName.toLowerCase()} · ${b.fum.dosage}`, 'fum'] : ['/dangerousGoods/0/IMOClass, subsidiaryRisks', `class ${declared.join(', ')} in r${h.n}`, 'cls'],
+    ] : [];
+    const side = `<div class="box-side">${cmp}${verdict}<div class="maplist">${maps.map((m) => `<button type="button" data-frag="${m[2]}"><span class="p">${esc(m[0])}</span><span class="d">${esc(m[1])}</span></button>`).join('')}</div><div class="story" style="font-size:12px;color:var(--muted)">The model points at physical things by reference: goods lines name their equipment, packaging nests inside the goods line. Tap a line for its JSON.</div></div>`;
+    pane.innerHTML = `<header><div><div class="eyebrow">${esc(b.label)} · ${esc(where)}</div><h2>${esc(b.eqF)}</h2></div><div class="revrail"><span>${esc(b.iso)}</span><span>${g ? `${g.pkg[0]} × ${esc(g.pkg[1])}` : esc(b.cargo)}</span></div></header><div class="box-body"><svg class="box-svg" viewBox="0 0 640 400" preserveAspectRatio="xMidYMid meet" aria-label="Container cutaway">${isoBox(b, ph.s, scanning, g ? !match : false)}</svg>${side}</div>`;
+    pane.querySelectorAll('[data-frag]').forEach((el) => { el.onclick = () => openFrag(b, h, el.dataset.frag, p); });
+  }
+  function openFrag(b, h, kind, p) {
+    if (!h) return;
+    const d = declJSON(b, h.n, state.t, p);
+    const body = kind === 'ute' ? { utilizedTransportEquipments: d.utilizedTransportEquipments } : kind === 'fum' ? { fumigation: d.utilizedTransportEquipments[0].fumigation } : kind === 'pkg' ? { outerPackagings: d.dangerousGoods[0].outerPackagings } : { dangerousGoods: d.dangerousGoods };
+    openJSON({ title: kind === 'ute' ? 'Equipment' : kind === 'pkg' ? 'Packaging' : kind === 'fum' ? 'Fumigation' : `Goods line ${b.line}`, sub: `${b.eqF} · ${pShort(p, b)}'s copy, r${h.n} · fragment`, meta: `Fragment of <b>${esc(b.ref)}</b> revision ${h.n} as held by <b>${esc(pName(p, b))}</b>.`, req: '', body });
+  }
+  function isoBox(b, phs, scanning, mismatch) {
+    const s = 64, ox = 300, oy = 150;
+    const P = (x, y, z) => [ox + (x - y) * C30 * s, oy + (x + y) * S30 * s - z * s];
+    const pt = (q) => q.map((v) => v.toFixed(1)).join(' ');
+    const poly = (pts, cls, extra = '') => `<path class="${cls}" d="M${pts.map((q) => pt(P(...q))).join('L')}Z" ${extra}/>`;
+    const L = 6.06, Wd = 2.44, Hh = 2.59;
+    let o = '';
+    // gate portal behind
+    const gateOn = phs === 'held' || phs === 'gate';
+    if (gateOn) {
+      const gx = L / 2;
+      o += `<path class="gate-arch" d="M${pt(P(gx, -0.7, 0))}L${pt(P(gx, -0.7, 3.4))}L${pt(P(gx, Wd + 0.7, 3.4))}L${pt(P(gx, Wd + 0.7, 0))}" style="stroke-width:5"/>`;
+    }
+    o += poly([[0, 0, 0], [L, 0, 0], [L, Wd, 0], [0, Wd, 0]], 'iso-floor iso-wall');
+    o += poly([[0, 0, 0], [L, 0, 0], [L, 0, Hh], [0, 0, Hh]], 'iso-far iso-wall');
+    o += poly([[0, 0, 0], [0, Wd, 0], [0, Wd, Hh], [0, 0, Hh]], 'iso-far iso-wall');
+    // cargo
+    const items = [];
+    if (b.cargo === 'drums' || b.cargo === 'pails') {
+      const r = b.cargo === 'drums' ? 0.29 : 0.15, hgt = b.cargo === 'drums' ? 0.88 : 0.38, step = r * 2.05;
+      const nx = Math.floor((L - 0.1) / step), ny = Math.floor((Wd - 0.06) / step), tiers = b.cargo === 'drums' ? 2 : 4;
+      for (let k = 0; k < tiers; k++) for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) items.push({ d: i + j, k, kind: 'cyl', x: 0.1 + r + i * step, y: 0.06 + r + j * step, z: k * (hgt + 0.06), r, h: hgt });
+    } else if (b.cargo === 'ibc') {
+      for (let i = 0; i < 5; i++) for (let j = 0; j < 2; j++) items.push({ d: i + j, k: 0, kind: 'cube', x: 0.1 + i * 1.18, y: 0.1 + j * 1.15, z: 0, w: 1.1, dpt: 1.05, h: 1.18 });
+    } else {
+      const bw = b.cargo === 'bags' ? 0.6 : 1.1, bd = b.cargo === 'bags' ? 0.4 : 1.0, bh = b.cargo === 'bags' ? 0.22 : 0.95;
+      const nx = Math.floor((L - 0.1) / (bw + 0.04)), ny = Math.floor((Wd - 0.1) / (bd + 0.04)), tiers = b.cargo === 'bags' ? 8 : 2;
+      for (let k = 0; k < tiers; k++) for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) items.push({ d: i + j, k, kind: 'cube', x: 0.08 + i * (bw + 0.04), y: 0.08 + j * (bd + 0.04), z: k * (bh + 0.02), w: bw, dpt: bd, h: bh });
+    }
+    items.sort((a, c) => a.k - c.k || a.d - c.d);
+    for (const it of items) {
+      if (it.kind === 'cyl') {
+        const [bx, by] = P(it.x, it.y, it.z), [tx, ty] = P(it.x, it.y, it.z + it.h);
+        const rx = it.r * 1.2247 * s, ry = it.r * 0.7071 * s;
+        o += `<path class="drum-b" d="M${(bx - rx).toFixed(1)} ${by.toFixed(1)}A${rx.toFixed(1)} ${ry.toFixed(1)} 0 0 0 ${(bx + rx).toFixed(1)} ${by.toFixed(1)}L${(tx + rx).toFixed(1)} ${ty.toFixed(1)}L${(tx - rx).toFixed(1)} ${ty.toFixed(1)}Z"/><ellipse class="drum-t" cx="${tx.toFixed(1)}" cy="${ty.toFixed(1)}" rx="${rx.toFixed(1)}" ry="${ry.toFixed(1)}"/>`;
+      } else {
+        const { x, y, z, w, dpt, h } = it;
+        o += poly([[x, y, z + h], [x + w, y, z + h], [x + w, y + dpt, z + h], [x, y + dpt, z + h]], 'crate-t');
+        o += poly([[x, y + dpt, z], [x + w, y + dpt, z], [x + w, y + dpt, z + h], [x, y + dpt, z + h]], 'crate-l');
+        o += poly([[x + w, y, z], [x + w, y + dpt, z], [x + w, y + dpt, z + h], [x + w, y, z + h]], 'crate-r');
+      }
+    }
+    // near walls (translucent long side, solid door end)
+    o += poly([[0, Wd, 0], [L, Wd, 0], [L, Wd, Hh], [0, Wd, Hh]], 'iso-near iso-wall');
+    for (let x = 0.2; x < L; x += 0.24) { const a = P(x, Wd, 0.05), c = P(x, Wd, Hh - 0.05); o += `<line class="iso-rib" x1="${a[0].toFixed(1)}" y1="${a[1].toFixed(1)}" x2="${c[0].toFixed(1)}" y2="${c[1].toFixed(1)}"/>`; }
+    o += poly([[L, 0, 0], [L, Wd, 0], [L, Wd, Hh], [L, 0, Hh]], 'iso-end iso-wall');
+    o += poly([[0, 0, Hh], [L, 0, Hh], [L, Wd, Hh], [0, Wd, Hh]], 'iso-edge', 'fill="none"');
+    // placards: on the long side and the door end, drawn in the wall planes
+    const wallM = (x, z) => { const [X, Y] = P(x, Wd, z); return `matrix(${(C30 * s).toFixed(2)} ${(S30 * s).toFixed(2)} 0 ${-s} ${X.toFixed(1)} ${Y.toFixed(1)})`; };
+    const endM = (y, z) => { const [X, Y] = P(L, y, z); return `matrix(${(C30 * s).toFixed(2)} ${(-S30 * s).toFixed(2)} 0 ${-s} ${X.toFixed(1)} ${Y.toFixed(1)})`; };
+    const plc = (txt) => txt === 'FUM'
+      ? `<rect class="iso-sign" x="-0.5" y="-0.35" width="1" height="0.7"/><text class="iso-signt" x="0" y="-0.05" transform="scale(1 -1)">DANGER</text><text class="iso-signt" x="0" y="0.2" transform="scale(1 -1)" style="fill:var(--ink)">FUMIGATED</text>`
+      : `<path class="iso-pl" d="M0 0.32L0.32 0L0 -0.32L-0.32 0Z" style="stroke-width:0.03"/><text class="iso-plt" transform="scale(1 -1)" x="0" y="0.02">${txt}</text>`;
+    b.placards.forEach((pl, k) => {
+      o += `<g transform="${wallM(1.1 + k * 0.85, 1.55)}">${plc(pl)}</g>`;
+      o += `<g transform="${endM(Wd - 0.75 - k * 0.85, 1.55)}">${plc(pl)}</g>`;
+    });
+    if (gateOn) {
+      const gx = L / 2;
+      const cam = P(gx, Wd + 0.7, 3.5);
+      o += `<rect class="gate-cam" x="${(cam[0] - 7).toFixed(1)}" y="${(cam[1] - 10).toFixed(1)}" width="14" height="9" rx="2"/>`;
+      if (scanning) { const c1 = P(L, Wd, 1.55); o += `<path class="scan" d="M${cam[0].toFixed(1)} ${cam[1].toFixed(1)}L${(c1[0] - 70).toFixed(1)} ${(c1[1] - 30).toFixed(1)}L${(c1[0] + 10).toFixed(1)} ${(c1[1] + 30).toFixed(1)}Z"/>`; }
+    }
+    const tag = P(0, Wd, Hh + 0.25);
+    o += `<text class="box-tag" x="${tag[0].toFixed(1)}" y="${tag[1].toFixed(1)}">${b.eqF} · ${b.iso}</text>`;
+    if (phs === 'held') { const c = P(L / 2, Wd / 2, Hh + 0.9); o += `<text class="box-held" x="${c[0].toFixed(1)}" y="${c[1].toFixed(1)}">HELD AT GATE</text>`; }
+    return o;
+  }
+
+  // ======================================================================= card
+  function storyFor(b, t) {
+    const r = issuedAt(b, t), ph = physAt(b, t).s;
+    if (b.id === 'H') {
+      if (t < EV.req) return 'Booked on MSC Gülsün. No declaration yet.';
+      if (!r) return 'MSC asked Haventrek for the declaration on Thursday 09:00 and Haventrek passed the request to Veldmeer. MSC knows the booking, not yet a declaration reference.';
+      if (r.n === 1 && t < EV.acc1) return 'Draft r1 reached MSC through Haventrek with its identity unchanged and one forwarding event added.';
+      if (r.n === 1) return `MSC accepted r1 at ${dayName(EV.acc1)} ${hhmm(EV.acc1)}. Acceptance is MSC's review result, so r1 stays DRAFT until Veldmeer finalizes it.`;
+      if (r.n === 2 && ph === 'plant') return t < EV.allR2 ? 'r2 FINAL changed only the status and the revision number. It is on its way down the chain.' : 'r2 FINAL changed only the status and the revision number. All five parties hold it.';
+      if (ph === 'road') return 'On the road from Moerdijk to ECT Delta. Every party holds r2 FINAL, UN 1993, class 3.';
+      if (ph === 'held' && t < EV.err) return 'Held at the gate. The placards show class 3 and class 8, while r2 declares UN 1993, class 3 only.';
+      if (ph === 'held' && r.n === 2) return `ECT Delta rejected r2 and pointed at /dangerousGoods/0/subsidiaryRisks. The same feedback item, with ECT Delta as originator, went to MSC and on to Haventrek${t >= EV.seen ? `, and Veldmeer picked it up at ${hhmm(EV.seen)}` : ''}.`;
+      if (ph === 'held') return `Veldmeer issued r3 at ${hhmm(EV.r3)}: UN 2924, class 3 with subsidiary risk 8, new EmS. ${t < EV.ect3 ? `ECT Delta still holds r2 until its ${hhmm(EV.ect3)} poll.` : t < EV.ectAcc3 ? 'ECT Delta has pulled it and is checking it.' : t < EV.acc3 ? 'ECT Delta accepted it; the gate waits for MSC to re-approve the reclassified booking.' : 'MSC re-approved and ECT Delta accepted it; the gate is releasing the box.'}`;
+      if (ph === 'yard') return `Released into the DG yard at ${hhmm(EV.rel)}, ${dur(CUTOFF - EV.rel)} before the cut-off and ${dur(EV.rel - EV.gate)} after the gate stop.`;
+      if (ph === 'rolled') return `Released at ${hhmm(EV.rel)}, ${dur(EV.rel - CUTOFF)} after the cut-off. The box waits in the DG yard for next week's sailing.`;
+      if (ph === 'quay') return 'Under the crane at ECT Delta.';
+      return 'Loaded on MSC Gülsün on Tuesday 05:10.';
+    }
+    if (b.id === 'W') return r && r.status === 'WITHDRAWN' ? 'Booking cancelled. Veldmeer withdrew the declaration as r2, and the withdrawal reached ECT Delta on its next poll. The Harbour Master never got it: MSC only pushes accepted FINAL revisions.' : r ? 'Draft r1 for a resin shipment, accepted by MSC.' : 'Booked on MSC Gülsün.';
+    if (b.id === 'L') {
+      if (!r) return reqAt(b, t) ? 'No declaration for the battery booking, so MSC sent a DGD request on Friday 12:00.' : 'Booked on MSC Gülsün.';
+      if (r.n === 1) return t < b.revs[0].mscReview.t ? 'r1 FINAL answers the request through requestCorrelation and references a UN 38.3 test summary.' : 'MSC left its review PENDING: the referenced UN 38.3 test summary is still a DRAFT document.';
+      return 'r2 references the final test summary. MSC accepted it, so it went to the Harbour Master.';
+    }
+    if (b.id === 'P') return r ? 'Oostkade pushes straight to MSC, with no forwarder in the chain.' : 'Booked on MSC Gülsün.';
+    if (b.id === 'C') return r ? 'Haventrek forwarded r1 unchanged: same reference and revision, plus a forwarding event.' : 'Booked on MSC Gülsün.';
+    if (b.id === 'G') return r ? 'The fumigation sits on the equipment, not on the goods line.' : 'Booked on MSC Gülsün.';
+    return '';
+  }
+  function lensStory(b, v, t) {
+    const nm = v === 'SHP' ? pShort('SHP', b) : PARTY[v].short;
+    const h = held(b, v, t), out = [];
+    if (!involved[b.id].includes(v)) return `${nm} is not part of this declaration's chain.`;
+    out.push(h ? `${nm} holds r${h.n} ${h.rev.status}, received ${dayName(h.at)} ${hhmm(h.at)}${h.copies > 1 ? `, plus ${h.copies - 1} duplicate${h.copies > 2 ? 's' : ''} dropped` : ''}.` : `${nm} has no copy yet.`);
+    const lf = lastOf(b, v, t, ['F', 'A']);
+    if (lf) out.push(`Last feedback: ${lf.fb.review === 'ACCEPTED' ? 'ACCEPTED' : lf.fb.sev} on r${lf.fb.rev}, ${lf.fb.origin === v ? 'sent' : 'from ' + pShort(lf.fb.origin, b)} ${dayName(lf.t)} ${hhmm(lf.t)}.`);
+    out.push('Other parties\' copies are hidden in this view.');
+    return out.join(' ');
+  }
+  function cellR(b, p, t) { const m = lastOf(b, p, t, ['R']); if (!m) return '<td class="c na">·</td>'; return `<td class="c R${t - m.t < 20 ? ' fresh' : ''}"><span class="dy">${dt2(m.t).slice(0, 2)} ${hhmm(m.t)}</span><b>REQ</b></td>`; }
+  function cellD(b, p, t) {
+    const h = held(b, p, t); if (!h) return '<td class="c na">·</td>';
+    const latest = issuedAt(b, t); const behind = state.lens === 'ALL' && latest && h.n < latest.n;
+    return `<td class="c D${t - h.at < 20 ? ' fresh' : ''}${behind ? ' behind' : ''}"><span class="dy">${dt2(h.at)}</span><b>r${h.n}</b>${h.copies > 1 ? `<sup>×${h.copies}</sup>` : ''}<span class="dy">${h.rev.status}</span>${behind ? `<span class="bh">${latest.n - h.n} behind</span>` : ''}</td>`;
+  }
+  function cellF(b, p, t) { const m = lastOf(b, p, t, ['F']); if (!m) return '<td class="c na">·</td>'; const e = m.fb.sev === 'ERROR'; return `<td class="c F${e ? ' err' : ''}${t - m.t < 20 ? ' fresh' : ''}"><span class="dy">${dt2(m.t)}</span><b>${e ? 'ERROR' : m.fb.sev}</b><span class="dy">r${m.fb.rev}</span></td>`; }
+  function cellA(b, p, t) { const m = lastOf(b, p, t, ['A']); if (!m) return '<td class="c na">·</td>'; return `<td class="c A${t - m.t < 20 ? ' fresh' : ''}"><span class="dy">${dt2(m.t)}</span><b>r${m.rev}</b><span class="dy">${esc(pShort(m.fb.origin, b))}</span></td>`; }
+  let cardKey = '';
+  function renderCard() {
+    const b = BOX[state.sel];
+    const tight = !isPhone() && state.view !== 'chain' && stage.clientWidth < 1120;   // narrow desktop: the document or box takes the card's place
+    if (!state.cardOpen || tight) { if (!card.hidden) { card.hidden = true; } cardKey = ''; return; }
+    card.hidden = false;
+    if (!isPhone()) { const sr = stage.getBoundingClientRect(), br = brand.getBoundingClientRect(); card.style.maxHeight = Math.max(220, sr.bottom - br.bottom - 24) + 'px'; } else card.style.maxHeight = '';
+    const t = state.t, v = state.lens, all = v === 'ALL';
+    const key = [b.id, Math.floor(t), v, state.openRow].join('|');
+    if (key === cardKey) return; cardKey = key;
+    const body = card.querySelector('.card-body'); const sc = body ? body.scrollTop : 0;
+    const h = all ? null : held(b, v, t);
+    const r = all ? issuedAt(b, t) : h && h.rev, g = r ? r.full.g : null;
+    const pill = pillFor(b, t, v);
+    const inv = involved[b.id];
+    const route = inv.filter((p) => p !== 'ECT' && p !== 'HM').map((p) => pShort(p, b)).join(' → ');
+    let status;
+    if (all) { const on = r ? inv.filter((p) => { const x = held(b, p, t); return x && x.n === r.n; }).length : 0; status = r ? `r${r.n} ${r.status} at ${on} of ${inv.length} parties` : 'No declaration yet'; }
+    else { const nm = v === 'SHP' ? pShort('SHP', b) : PARTY[v].short; status = h ? `${nm} holds r${h.n} ${h.rev.status}` : `${nm} has no copy yet`; }
+    const rowsFor = all ? inv : inv.filter((p) => p === v);
+    const open = all ? state.openRow : v;
+    let rows = '';
+    for (const p of rowsFor) {
+      rows += `<tr class="row${open === p ? ' open' : ''}${v === p ? ' lens' : ''}" data-p="${p}"><td class="svc">${esc(pShort(p, b))}<span class="who">${esc(pKind(p))}</span></td>${cellR(b, p, t)}${cellD(b, p, t)}${cellF(b, p, t)}${cellA(b, p, t)}</tr>`;
+      if (open === p) {
+        const hist = byBox[b.id].filter((m) => m.t <= t && knows(m, p));
+        rows += `<tr class="hist"><td colspan="5"><div class="hist-list">${hist.length ? hist.slice().reverse().map((m) => `<button type="button" data-msg="${m.id}"><i class="cls ${tokColor(m)}">${m.k}</i><span class="mono" style="font-size:11px">${dt2(m.t)}</span><span class="who">${esc(m.op)} · ${esc(pShort(m.from, b))} → ${esc(pShort(m.to, b))}${m.k === 'D' ? ` · r${m.rev}` : ''}${m.dup ? ' · duplicate' : ''}</span></button>`).join('') : '<span class="who" style="padding:4px 2px">Nothing yet.</span>'}</div></td></tr>`;
+      }
+    }
+    if (!rowsFor.length) rows = `<tr><td colspan="5" class="svc" style="color:var(--muted)">Not part of this declaration's chain.</td></tr>`;
+    const what = (n) => { const d = revDiff(b, n); return n === 1 ? 'first issue' : d.length === 1 && d[0] === 'declarationStatus' ? 'status only' : d.join(', '); };
+    const revList = all ? b.revs.filter((x) => x.t <= t).map((x) => ({ n: x.n, at: x.t, rev: x })) : received(b, v, t);
+    const revs = revList.map((x) => `<div><b>r${x.n}</b><span class="tm">${dt2(x.at)}</span><span>${x.rev.status} · ${esc(what(x.n))}</span></div>`).join('') || `<div class="future"><b>r–</b><span class="tm"></span><span>${all ? 'No revision issued yet' : 'No revision received yet'}</span></div>`;
+    card.innerHTML = `<div class="card-head"><div><div class="eyebrow">MSC Gülsün · ${VOY} · ${b.bkg}${all ? '' : ` · ${esc(v === 'SHP' ? pShort('SHP', b) : PARTY[v].short)}'s view`}</div><h2>${b.eqF}</h2></div><div class="acts"><button class="btn" type="button" data-act="doc">Document</button><button class="btn icon" type="button" data-act="close" aria-label="Close">×</button></div>
+      <div class="sub">${g ? `UN ${esc(g.un)} · ${esc(g.psn.charAt(0) + g.psn.slice(1).toLowerCase())} ${classBadges(g)}${g.pg ? ` · PG ${['', 'I', 'II', 'III'][g.pg]}` : ''} · ${g.pkg[0]} × ${esc(g.pkg[1])}` : `${esc(b.label)} · ${all ? 'no declaration yet' : 'no copy yet'}`} · ${esc(route)}</div></div>
+      <div class="card-body"><div class="status-line"><span class="pill ${pill.c}">${pill.txt}</span><span>${esc(status)}</span></div>
+      <p class="story">${esc(all ? storyFor(b, t) : lensStory(b, v, t))}</p>
+      <table class="erpa"><thead><tr><th>Party</th><th class="c" title="Request">R</th><th class="c" title="Declaration held">D</th><th class="c" title="Feedback">F</th><th class="c" title="Accepted">A</th></tr></thead><tbody>${rows}</tbody></table>
+      <div class="card-sec">${all ? 'Revisions issued' : 'Revisions received'}</div><div class="revs">${revs}</div></div>`;
+    card.querySelector('.card-body').scrollTop = sc;
+  }
+  card.addEventListener('click', (e) => {
+    const a = e.target.closest('[data-act]');
+    if (a) { if (a.dataset.act === 'close') { state.cardOpen = false; uiDirty = true; } else setView('doc'); return; }
+    const m = e.target.closest('[data-msg]'); if (m) { openMsg(m.dataset.msg); return; }
+    const r = e.target.closest('tr.row'); if (r) { state.openRow = state.openRow === r.dataset.p ? null : r.dataset.p; cardKey = ''; renderCard(); }
+  });
+
+  // ======================================================================= gantt
+  const GSPAN = 60 * 60;
+  let G0 = 0, G1 = GSPAN, gFrozen = false;
+  const gWin = (t) => { if (gFrozen) return; G0 = clamp(Math.floor((t - 44 * 60) / 360) * 360, 0, T_END - GSPAN); G1 = G0 + GSPAN; };
+  const gx = (t) => ((clamp(t, G0, G1) - G0) / (G1 - G0)) * 100;
+  const seg = (a, b2, cls, inner = '') => (b2 <= a ? '' : `<div class="seg ${cls}" style="left:${gx(a)}%;width:${gx(b2) - gx(a)}%">${inner}</div>`);
+  function renderGantt() {
+    const b = BOX[state.sel], t = state.t;
+    gWin(t);
+    let ticks = '';
+    for (let k = Math.ceil(G0 / 360) * 360; k < G1 - 60; k += 360) { const mid = mod(k, 1440) === 0; ticks += `<span class="${mid ? '' : 'minor'}" style="left:${gx(k)}%">${mid ? `${dayName(k)} ${DATE[dIdx(k)]}` : hhmm(k)}</span>`; }
+    let html = `<div class="g-axis"><div></div><div class="ticks">${ticks}</div></div>`;
+    // vessel row
+    let v = seg(0, Math.min(t, T(4, 1, 30)), 'exp') + seg(T(4, 1, 30), Math.min(t, T(5, 11, 54)), 'along') + seg(T(4, 2, 0), Math.min(t, T(5, 11, 30)), 'ops');
+    if (t < T(4, 1, 30)) v += seg(T(4, 1, 30), T(5, 11, 54), 'plan');
+    v += `<div class="mark etd" style="left:${gx(T(5, 11, 54))}%" title="ETD Tue 11:54"></div>`;
+    html += `<div class="g-row"><button class="g-name" type="button" tabindex="-1">MSC Gülsün</button><div class="g-track">${v}</div></div>`;
+    // box row
+    let bx = '';
+    for (let i = 0; i < b.phys.length; i++) {
+      const [a, s] = b.phys[i]; const e = Math.min(t, i + 1 < b.phys.length ? b.phys[i + 1][0] : T_END);
+      if (a > t) break;
+      const cls = { plant: 'plant', road: 'road', held: 'held', gate: 'yard', yard: 'yard', rolled: 'yard', quay: 'yard', aboard: 'aboard', gone: 'wd' }[s];
+      bx += seg(a, e, cls);
+    }
+    if (b.id !== 'W') bx += `<div class="mark cut" style="left:${gx(CUTOFF)}%" title="DG cut-off Sun 18:00"></div>`;
+    html += `<div class="g-row"><button class="g-name sel" type="button" tabindex="-1">${b.eqF}</button><div class="g-track">${bx}</div></div>`;
+    // party rows: revision held over time
+    for (const p of involved[b.id].filter((q) => state.lens === 'ALL' || q === state.lens)) {
+      let tr = '';
+      const changes = [];
+      if (p === 'SHP') for (const r of b.revs) changes.push([r.t, r.n]);
+      else { let best = 0; for (const m of byBox[b.id]) if (m.k === 'D' && m.to === p && m.rev > best) { best = m.rev; changes.push([m.t, m.rev]); } }
+      for (let i = 0; i < changes.length; i++) {
+        const [a, n] = changes[i]; if (a > t) break;
+        const e = Math.min(t, i + 1 < changes.length ? changes[i + 1][0] : T_END);
+        const st = b.revs[n - 1].status;
+        tr += seg(a, e, st === 'WITHDRAWN' ? 'wd' : 'r' + Math.min(n, 4), (gx(e) - gx(a)) > 4 ? `<span class="rl">r${n}</span>` : '');
+      }
+      // error window: party knows an ERROR on the revision it holds
+      for (const k of fbKnown(b, p, T_END)) {
+        if (k.f.sev !== 'ERROR' || k.at > t) continue;
+        const next = changes.find((c) => c[1] > k.f.rev); const e = Math.min(t, next ? next[0] : T_END);
+        tr += seg(k.at, e, 'err');
+      }
+      for (const m of byBox[b.id]) { if (m.t > t) break; if (m.t < G0) continue; if (m.k !== 'D' && knows(m, p)) tr += `<div class="tick ${tokColor(m)}" style="left:${gx(m.t)}%" title="${esc(m.op)} ${dt2(m.t)}"></div>`; }
+      html += `<div class="g-row"><button class="g-name${state.lens === p ? ' sel' : ''}" type="button" data-lens="${p}">${esc(pShort(p, b))}</button><div class="g-track">${tr}</div></div>`;
+    }
+    html += `<div class="g-area" style="left:116px"></div>`;
+    const gz = $('gantt'); gz.innerHTML = html;
+    const track = gz.querySelector('.g-track'); if (!track) return;
+    const tr = track.getBoundingClientRect(), gr = gz.getBoundingClientRect();
+    const left = tr.left - gr.left, w = tr.width;
+    if (b.id === 'H') { const a = EV.gate, e = Math.min(t, EV.rel); if (t >= a) gz.insertAdjacentHTML('beforeend', `<div class="g-dis" style="left:${left + (gx(a) / 100) * w}px;width:${((gx(e) - gx(a)) / 100) * w}px"></div>`); }
+    gz.insertAdjacentHTML('beforeend', `<div class="g-ph" style="left:${left + (gx(t) / 100) * w}px;top:12px"></div>`);
+  }
+  $('g-legend').innerHTML = [
+    ['r1', 'background:color-mix(in srgb,var(--e) 32%,var(--panel))'], ['r2', 'background:color-mix(in srgb,var(--e) 62%,var(--panel))'], ['r3', 'background:var(--e)'],
+    ['Open error', 'background:var(--crit);height:3px'], ['Request', 'background:var(--r);width:3px'], ['Feedback', 'background:var(--p);width:3px'], ['Accepted', 'background:var(--a);width:3px'],
+    ['On the road', 'background:var(--g-naut)'], ['Held', 'background:var(--crit)'], ['DG yard', 'background:var(--g-berth)'], ['Aboard', 'background:var(--g-cargo)'],
+  ].map(([k, s]) => `<span><i style="${s}"></i>${k}</span>`).join('') + '<span><i style="border:1.5px solid var(--p);transform:rotate(45deg);width:7px;height:7px"></i>DG cut-off</span>';
+  function seekFromEvent(e) {
+    const tr = $('gantt').querySelector('.g-track'); if (!tr) return;
+    const r = tr.getBoundingClientRect(); const u = clamp((e.clientX - r.left) / r.width, 0, 1);
+    state.t = G0 + u * (G1 - G0); uiDirty = true;
+  }
+  let scrub = false;
+  $('gantt').addEventListener('pointerdown', (e) => {
+    const n = e.target.closest('[data-lens]'); if (n) { const p = n.dataset.lens; if (['SHP', 'MSC', 'ECT'].includes(p)) setLens(state.lens === p ? 'ALL' : p); return; }
+    if (!e.target.closest('.g-track')) return; hideGuide(); scrub = true; gFrozen = true; seekFromEvent(e);
+  });
+  window.addEventListener('pointermove', (e) => { if (scrub) seekFromEvent(e); });
+  window.addEventListener('pointerup', () => { if (scrub) { scrub = false; gFrozen = false; uiDirty = true; } });
+
+  // ======================================================================= side panels
+  function renderDecl() {
+    const t = state.t, v = state.lens, all = v === 'ALL', selShp = BOX[state.sel].shp;
+    $('d-meta').textContent = all ? `${BOXES.length} boxes for MSC Gülsün ${VOY}` : v === 'SHP' ? `As ${SHIPPER[selShp].short} knows them` : `As ${LENS_NAME[v]} knows them`;
+    const list = all || v !== 'SHP' ? BOXES : BOXES.filter((b) => b.shp === selShp);
+    $('dlist').innerHTML = list.map((b) => {
+      const inv = involved[b.id];
+      const r = all ? issuedAt(b, t) : (held(b, v, t) || {}).rev, g = r ? r.full.g : null, pill = pillFor(b, t, v);
+      let nx, bar = '';
+      if (all) {
+        const on = r ? inv.filter((p) => { const h = held(b, p, t); return h && h.n === r.n; }).length : 0;
+        const err = inv.some((p) => openError(b, p, t));
+        const frac = r ? on / inv.length : 0;
+        nx = !r ? (reqAt(b, t) ? `Request ${dt2(reqAt(b, t).t)}` : 'No declaration yet') : r.status === 'WITHDRAWN' ? `r${r.n} WITHDRAWN` : `r${r.n} ${r.status} · ${on}/${inv.length}`;
+        bar = `<div class="bar"><i style="width:${(frac * 100).toFixed(0)}%;background:${err ? 'var(--crit)' : frac < 1 ? 'var(--accent)' : 'var(--a)'}"></i></div>`;
+      } else nx = !inv.includes(v) ? 'Not in this chain' : r ? `r${r.n} ${r.status} · ${dt2(held(b, v, t).at)}` : 'No copy yet';
+      return `<button class="vrow${b.id === state.sel ? ' sel' : ''}" type="button" data-box="${b.id}"><span class="n">${b.eqF}</span><span class="pill ${pill.c}">${pill.txt}</span><span class="s">${g ? `UN ${esc(g.un)} ${classBadges(g)} ` : ''}${esc(b.label)} · ${esc(SHIPPER[b.shp].short)}${b.via ? ' via Haventrek' : ', direct'}</span><span class="nx">${esc(nx)}</span>${bar}</button>`;
+    }).join('');
+  }
+  $('dlist').addEventListener('click', (e) => { const r = e.target.closest('[data-box]'); if (r) select(r.dataset.box); });
+
+  function renderExchange() {
+    const t = state.t, n = countTo(t), v = state.lens, all = v === 'ALL', selShp = BOX[state.sel].shp;
+    const mine = (m) => all || (knows(m, v) && (v !== 'SHP' || BOX[m.box].shp === selShp));
+    $('x-meta').textContent = all ? 'All parties · DGD 1.0' : `${v === 'SHP' ? SHIPPER[selShp].short : PARTY[v].short}'s messages`;
+    let last24 = 0; const cnt = { R: 0, D: 0, F: 0, A: 0 };
+    for (let i = 0; i < n; i++) { const m = MSGS[i]; if (!mine(m)) continue; cnt[m.k]++; if (m.t > t - 1440) last24++; }
+    $('x-sent').textContent = last24;
+    const col = { R: 'var(--r)', D: 'var(--e)', F: 'var(--p)', A: 'var(--a)' };
+    const nm = { R: 'Requested', D: 'Declared', F: 'Feedback', A: 'Accepted' };
+    const tot = Math.max(1, cnt.R + cnt.D + cnt.F + cnt.A);
+    $('x-bar').innerHTML = ['R', 'D', 'F', 'A'].map((k) => `<i style="width:${(cnt[k] / tot) * 100}%;background:${col[k]}"></i>`).join('');
+    $('x-legend').innerHTML = ['R', 'D', 'F', 'A'].map((k) => `<span><i style="background:${col[k]}"></i>${nm[k]} ${cnt[k]}</span>`).join('');
+    if (all) {
+      let open = 0;
+      for (const b of BOXES) {
+        const r = issuedAt(b, t); if (!r || r.status === 'WITHDRAWN') continue;
+        const mscOk = acceptedBy(b, 'MSC', r.n, t), ect = held(b, 'ECT', t);
+        const ectOk = ect && ect.n === r.n ? acceptedBy(b, 'ECT', r.n, t) : null;
+        if (!mscOk || !ectOk) open++;
+      }
+      $('x-open').textContent = open; $('x-open-k').textContent = 'awaiting acceptance by MSC or ECT Delta';
+      let lastAcc = null;
+      for (let i = n - 1; i >= 0; i--) { const m = MSGS[i]; if (m.k === 'A' && m.fb.origin === 'MSC' && m.from === 'MSC') { lastAcc = m; break; } }
+      if (lastAcc) { const r = BOX[lastAcc.box].revs[lastAcc.rev - 1]; $('x-acc').innerHTML = durShort(lastAcc.t - r.t); } else $('x-acc').innerHTML = '–';
+      $('x-acc-k').textContent = 'last issue to MSC acceptance';
+    } else {
+      const boxes = BOXES.filter((b) => v !== 'SHP' || b.shp === selShp);
+      const copies = boxes.filter((b) => held(b, v, t)).length;
+      const open = boxes.filter((b) => { const h = held(b, v, t); if (!h) return false; return fbKnown(b, v, t).some((k) => k.f.rev === h.n && k.f.review !== 'ACCEPTED' && k.f.sev !== 'INFO'); }).length;
+      $('x-open').textContent = open; $('x-open-k').textContent = 'copies with open feedback';
+      $('x-acc').innerHTML = String(copies); $('x-acc-k').textContent = 'declaration copies held';
+    }
+    // outcomes: they compare parties, so only in the All view
+    const H = BOX.H, inv = involved.H; let out = '';
+    if (!all) out = `<div class="outcome info wide"><div class="k">Outcome cards compare parties. Switch to All to see them.</div></div>`;
+    else if (t < EV.gate) {
+      const r = issuedAt(H, t);
+      if (r) { const on = inv.filter((p) => { const h = held(H, p, t); return h && h.n === r.n; }).length; out += `<div class="outcome info"><div class="v">${on} of ${inv.length}</div><div class="k">parties hold r${r.n} of MSCU 482901 7.</div></div>`; }
+      else out += `<div class="outcome info"><div class="v">${t >= EV.req ? dur(t - EV.req) : '–'}</div><div class="k">since MSC asked for the MSCU 482901 7 declaration.</div></div>`;
+      if (t >= EV.r2) out += `<div class="outcome good"><div class="v">${dur(EV.r2 - EV.req)}</div><div class="k">from MSC's request to Veldmeer's FINAL r2.</div></div>`;
+      else if (r) out += `<div class="outcome warn"><div class="v">${r.status}</div><div class="k">${t >= EV.acc1 ? 'Accepted by MSC and still a draft: only the shipper finalizes.' : 'Waiting for MSC review.'}</div></div>`;
+    } else if (t < EV.rel) {
+      out += `<div class="outcome warn" style="box-shadow:inset 0 3px 0 var(--crit)"><div class="v">${dur(t - EV.gate)}</div><div class="k">held at the gate. DG cut-off at 18:00.</div></div>`;
+      const r = issuedAt(H, t);
+      if (r.n < 3) { const k = inv.filter((p) => fbKnown(H, p, t).some((x) => x.f.id === 'H-err')).length; out += `<div class="outcome info"><div class="v">${k} of ${inv.length}</div><div class="k">parties have seen ECT Delta's ERROR on r2.</div></div>`; }
+      else { const on = inv.filter((p) => { const h = held(H, p, t); return h && h.n === 3; }).length; out += `<div class="outcome info"><div class="v">${on} of ${inv.length}</div><div class="k">parties hold r3, issued at ${hhmm(EV.r3)}.</div></div>`; }
+    } else {
+      out += `<div class="outcome ${EV.made ? 'good' : 'warn'}"><div class="v">${dur(EV.rel - EV.gate)}</div><div class="k">from gate stop to release. One new revision changed five fields.</div></div>`;
+      out += `<div class="outcome info"><div class="v">${dur(EV.all3 - EV.r3)}</div><div class="k">from r3 issued to all five parties holding it.</div></div>`;
+      out += EV.made
+        ? `<div class="outcome good wide"><div class="v">${dur(CUTOFF - EV.rel)}</div><div class="k">to spare before the DG cut-off. A rolled box would wait for next week's sailing (assumed weekly service).</div></div>`
+        : `<div class="outcome warn wide" style="box-shadow:inset 0 3px 0 var(--crit)"><div class="v">${dur(EV.rel - CUTOFF)}</div><div class="k">past the DG cut-off. MSCU 482901 7 waits for next week's sailing (assumed weekly service).</div></div>`;
+    }
+    $('x-out').innerHTML = out;
+    const bars = []; const h0 = Math.floor(t / 60);
+    for (let h = h0 - 23; h <= h0; h++) { let c = 0; for (let i = countTo(h * 60 - 0.001); i < countTo(h * 60 + 59.99); i++) if (mine(MSGS[i])) c++; bars.push([c, h === h0]); }
+    const mx = Math.max(3, ...bars.map((x) => x[0]));
+    $('x-spark').innerHTML = bars.map(([c, now]) => `<i class="${now ? 'now' : ''}" style="height:${(c / mx) * 100}%"></i>`).join('');
+  }
+
+  function renderParties() {
+    const t = state.t, n = countTo(t), v = state.lens;
+    const sent = {}, recv = {}, relay = {};
+    for (const p of ORDER) { sent[p] = 0; recv[p] = 0; relay[p] = 0; }
+    for (let i = 0; i < n; i++) { const m = MSGS[i]; sent[m.from]++; recv[m.to]++; if (m.relay) relay[m.from]++; }
+    const ectPolls = Math.floor(t / params.ectPoll) + 1;
+    const ectNews = new Set(MSGS.slice(0, n).filter((m) => m.to === 'ECT' && m.pull && !m.dup).map((m) => m.t)).size;
+    const ectDup = MSGS.slice(0, n).filter((m) => m.to === 'ECT' && m.dup).length;
+    const viaShippers = new Set(BOXES.filter((b) => b.via).map((b) => b.shp)).size;
+    const shpNews = MSGS.slice(0, n).filter((m) => m.to === 'SHP' && m.pull && !m.dup).length;
+    const rows = [
+      ['SHP', 'Shippers', 'Producer', `Push <span class="mono">POST /dgds</span> to Haventrek, or straight to MSC · pull <span class="mono">GET /dgd-feedbacks</span> from Haventrek every ${params.shpPoll} min`, `<span>sent <b>${sent.SHP}</b></span><span>feedback polls <b>${(Math.floor(t / params.shpPoll) + 1) * viaShippers}</b>, <b>${shpNews}</b> with news</span>`],
+      ['FWD', 'Haventrek Logistics', 'Forwarder', 'Relays declarations to MSC and requests and feedback back up. Identity, revision, feedback ID and originator stay as they are.', `<span>received <b>${recv.FWD}</b></span><span>relayed <b>${relay.FWD}</b></span>`],
+      ['MSC', 'MSC', 'Consumer · forwarder', `Receives push · checks a revision in ${REVIEW} min, a reclassification in ${params.reapprove} min · reports accepted FINAL revisions to the Harbour Master · serves <span class="mono">GET /dgds</span> to ECT Delta`, `<span>received <b>${recv.MSC}</b></span><span>sent <b>${sent.MSC}</b></span>`],
+      ['ECT', 'ECT Delta', 'Consumer', `Pulls <span class="mono">GET /dgds</span> every ${params.ectPoll} min, window starting ${OVL_D} min before its last poll · pushes feedback to MSC`, `<span>polls <b>${ectPolls}</b>, <b>${ectNews}</b> with news, <b>${ectDup}</b> duplicates dropped</span>`],
+      ['HM', 'Harbour Master', 'Consumer', 'Receives accepted FINAL revisions from MSC. Shown as a direct push, as in a port without a community system; in Rotterdam this report goes through Portbase.', `<span>received <b>${recv.HM}</b></span>`],
+    ].filter((r) => v === 'ALL' || r[0] === v);
+    $('plist').innerHTML = rows.map(([p, nm, role, m, c]) => `<div class="prow${v === p ? ' lens' : ''}"><span class="n">${nm}</span><span class="r">${role}</span><span class="m">${m}</span><span class="c">${c}</span></div>`).join('');
+  }
+
+  function renderAlerts() {
+    const t = state.t, p = state.lens;
+    const vis = ALERTS.filter((a) => a.t <= t && (p === 'ALL' || (a.who[p] !== undefined && a.who[p] <= t)));
+    $('a-meta').textContent = p === 'ALL' ? 'Latest first' : `As seen by ${p === 'SHP' ? 'the shipper' : PARTY[p].short}`;
+    $('alerts').innerHTML = vis.slice(-6).reverse().map((a) => {
+      const active = a.until && t < a.until;
+      return `<div class="alert ${a.sev}${active ? ' active' : ''}"><div class="h">${esc(a.title)}${a.box ? ` · ${BOX[a.box].eqF}` : ''}<span>${dt2(a.t)}</span></div><p>${esc(a.text)}</p></div>`;
+    }).join('') || '<div class="alert"><p>Nothing yet.</p></div>';
+  }
+
+  let feedKey = '';
+  function renderFeed() {
+    const t = state.t, n = countTo(t), p = state.lens;
+    const key = [n, p, state.sel, Math.floor(t / 5)].join('|'); if (key === feedKey) return; feedKey = key;
+    const sel = BOX[state.sel];
+    const list = [];
+    for (let i = n - 1; i >= 0 && list.length < 60; i--) {
+      const m = MSGS[i], b = BOX[m.box];
+      if (p !== 'ALL') { if (!knows(m, p)) continue; if (p === 'SHP' && b.shp !== sel.shp) continue; }
+      list.push(m);
+    }
+    const el = $('feed'); const sc = el.scrollTop;
+    el.innerHTML = list.map((m) => {
+      const b = BOX[m.box];
+      const what = m.k === 'R' ? 'DGD request' : m.k === 'D' ? `r${m.rev} ${b.revs[m.rev - 1].status}${m.dup ? ' again' : ''}` : m.fb.review === 'ACCEPTED' ? `Accepted r${m.rev}` : `${m.fb.sev} r${m.rev}`;
+      const how = m.pull ? `${pShort(m.to, b)} pulls from ${pShort(m.from, b)}` : `${pShort(m.from, b)} → ${pShort(m.to, b)}`;
+      const tag = m.relay ? ' · relayed' : m.dup ? ' · duplicate' : '';
+      return `<button type="button" class="${t - m.t < 20 ? 'new' : ''}" data-msg="${m.id}"><i class="cls ${tokColor(m)}">${m.k}</i><span class="c1">${esc(what)} · ${b.eqF}</span><span class="val">${dt2(m.t)}</span><span class="c2"><span class="mono">${esc(m.op)}</span> · ${esc(how)}${tag}</span></button>`;
+    }).join('') || '<div style="padding:6px;color:var(--muted);font-size:12px">No messages yet.</div>';
+    el.scrollTop = sc;
+  }
+  $('feed').addEventListener('click', (e) => { const r = e.target.closest('[data-msg]'); if (r) openMsg(r.dataset.msg); });
+
+  // ======================================================================= controls
+  function setLens(l) {
+    state.lens = l;
+    document.querySelectorAll('#lens button').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.lens === l)));
+    lastSeen[l] = state.t;
+    deskKey = cardKey = feedKey = docKey = boxKey = ''; uiDirty = true;
+  }
+  const lastSeen = { ALL: T_START, SHP: T_START, MSC: T_START, ECT: T_START };
+  function setView(v) {
+    state.view = v;
+    document.querySelectorAll('#views button').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.view === v)));
+    deskKey = docKey = boxKey = ''; uiDirty = true;
+  }
+  function select(id) {
+    if (!BOX[id]) return;
+    state.sel = id; state.cardOpen = true; state.openRow = null;
+    $('lens-shp').textContent = SHIPPER[BOX[id].shp].short;
+    deskKey = cardKey = feedKey = docKey = boxKey = ''; uiDirty = true;
+  }
+  function setPlaying(p) {
+    state.playing = p;
+    $('play').innerHTML = p ? '<svg viewBox="0 0 14 14"><rect x="2" y="1" width="3.5" height="12" rx="1"/><rect x="8.5" y="1" width="3.5" height="12" rx="1"/></svg>' : '<svg viewBox="0 0 14 14"><path d="M3 1.5v11l9.5-5.5z"/></svg>';
+    $('play').setAttribute('aria-label', p ? 'Pause' : 'Play');
+  }
+  $('play').onclick = () => { if (guide.on) hideGuide(); if (!state.playing && state.t >= T_END) state.t = T(0, 8, 0); setPlaying(!state.playing); };
+  document.querySelectorAll('.speed button').forEach((x) => { x.onclick = () => { state.speed = +x.dataset.speed; document.querySelectorAll('.speed button').forEach((y) => y.setAttribute('aria-pressed', String(y === x))); }; });
+  document.querySelectorAll('#lens button').forEach((x) => { x.onclick = () => setLens(x.dataset.lens); });
+  document.querySelectorAll('#views button').forEach((x) => { x.onclick = () => setView(x.dataset.view); });
+  function renderMoments() { $('moments').innerHTML = MOMENTS.map((m, i) => `<button type="button" data-i="${i}"><span>${dt2(m.t)}</span>${esc(m.label)}</button>`).join(''); }
+  renderMoments();
+  $('moments').addEventListener('click', (e) => { const b = e.target.closest('[data-i]'); if (!b) return; const m = MOMENTS[+b.dataset.i]; hideGuide(); state.t = m.t; select(m.sel); setLens(m.lens); setView(m.view); });
+
+  // ---------------------------------------------------------------- what if
+  const WHATIF = [
+    ['ectPoll', 'ECT Delta polls GET /dgds every', [[5, '5 min'], [15, '15 min'], [30, '30 min'], [60, '1 h']]],
+    ['shpPoll', 'Veldmeer checks feedback every', [[5, '5 min'], [15, '15 min'], [30, '30 min'], [60, '1 h']]],
+    ['fix', 'Veldmeer corrects its record in', [[30, '30 min'], [60, '1 h'], [120, '2 h'], [180, '3 h']]],
+    ['reapprove', 'MSC re-approves the new UN number in', [[20, '20 min'], [45, '45 min'], [90, '1.5 h'], [180, '3 h']]],
+  ];
+  $('wi-rows').innerHTML = WHATIF.map(([k, label, opts]) => `<div class="wrow"><span class="k">${esc(label)}</span><div class="speed" role="group" aria-label="${esc(label)}" data-param="${k}">${opts.map(([v, l]) => `<button type="button" data-v="${v}">${l}</button>`).join('')}</div></div>`).join('');
+  function renderWhatIf() {
+    document.querySelectorAll('#wi-rows [data-param]').forEach((g) => g.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(+x.dataset.v === params[g.dataset.param]))));
+    const res = $('wi-res');
+    res.className = 'wres ' + (EV.made ? 'good' : 'bad');
+    res.innerHTML = EV.made
+      ? `<b>Released ${dayName(EV.rel)} ${hhmm(EV.rel)}</b>, ${dur(CUTOFF - EV.rel)} before the 18:00 cut-off. Gate stop to release: ${dur(EV.rel - EV.gate)}.`
+      : `<b>Released ${dayName(EV.rel)} ${hhmm(EV.rel)}</b>, ${dur(EV.rel - CUTOFF)} after the 18:00 cut-off. The box misses MSC Gülsün.`;
+    $('wi-trace').textContent = `ERROR ${hhmm(EV.err)} · Veldmeer sees it ${hhmm(EV.seen)} · r3 ${hhmm(EV.r3)} · MSC re-approves ${hhmm(EV.acc3)} · ECT Delta pulls r3 ${hhmm(EV.ect3)} · accepts ${hhmm(EV.ectAcc3)} · release ${hhmm(EV.rel)}`;
+    $('wi-reset').disabled = Object.keys(PDEF).every((k) => params[k] === PDEF[k]);
+  }
+  function rebuild() {
+    build(); renderMoments(); renderWhatIf();
+    deskKey = cardKey = feedKey = docKey = boxKey = ''; uiDirty = true;
+    if (guide.on) { const s = STEPS[guide.i]; $('guide-text').innerHTML = s.text; }
+  }
+  $('wi-rows').addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (!b) return; params[b.closest('[data-param]').dataset.param] = +b.dataset.v; rebuild(); });
+  $('wi-reset').onclick = () => { Object.assign(params, PDEF); rebuild(); };
+  $('wi-replay').onclick = () => { hideGuide(); select('H'); setLens('ALL'); setView('chain'); state.t = EV.gate - 20; setPlaying(true); };
+
+  // ---------------------------------------------------------------- guided opening
+  const guide = { on: false, i: 0, anim: null };
+  const gEl = $('guide');
+  function effSpeed() { return guide.anim ? Math.max(10, (guide.anim.to - guide.anim.from) / (guide.anim.dur / 1000)) : state.speed; }
+  function applyStep(s) { select('H'); setLens(s.lens); setView(s.view); uiDirty = true; }
+  function showStep(i, animate = true) {
+    guide.on = true; guide.i = clamp(i, 0, STEPS.length - 1);
+    const s = STEPS[guide.i];
+    gEl.hidden = false; stage.classList.add('guiding');
+    $('guide-n').textContent = `${guide.i + 1} / ${STEPS.length}`;
+    $('guide-text').innerHTML = s.text;
+    $('guide-next').textContent = s.end ? 'Explore' : 'Next';
+    $('guide-back').disabled = guide.i === 0;
+    setPlaying(false);
+    if (animate && s.t > state.t && s.t - state.t < 3 * 1440) {
+      select('H'); setLens('ALL'); setView('chain');
+      guide.anim = { from: state.t, to: s.t, t0: performance.now(), dur: clamp((s.t - state.t) / 90, 0.8, 2.6) * 1000, step: s };
+    } else { guide.anim = null; state.t = s.t; applyStep(s); }
+    placeGuide();
+  }
+  function hideGuide() { guide.on = false; guide.anim = null; gEl.hidden = true; stage.classList.remove('guiding'); deskKey = docKey = boxKey = ''; uiDirty = true; }
+  function placeGuide() {
+    if (gEl.hidden) return;
+    const g = geom();
+    const float = !g.phone && g.H < 600;   // short stage: float the tour over the timeline instead of squeezing the scene
+    if (float !== gEl.classList.contains('float')) { gEl.classList.toggle('float', float); deskKey = docKey = boxKey = ''; uiDirty = true; }
+    if (g.phone) { gEl.style.left = '10px'; gEl.style.width = 'auto'; gEl.style.right = '10px'; gEl.style.bottom = '56px'; return; }
+    if (float) { const sr = stage.getBoundingClientRect(), w = Math.min(640, sr.width - 24); gEl.style.right = 'auto'; gEl.style.left = (sr.left + (sr.width - w) / 2) + 'px'; gEl.style.width = w + 'px'; gEl.style.bottom = '14px'; return; }
+    const x0 = g.x0, w = Math.min(640, g.x1 - x0);
+    gEl.style.right = 'auto'; gEl.style.left = (x0 + (g.x1 - x0 - w) / 2) + 'px'; gEl.style.width = w + 'px'; gEl.style.bottom = '14px';
+  }
+  $('guide-next').onclick = () => {
+    if (guide.anim) { const s = guide.anim.step; guide.anim = null; state.t = s.t; applyStep(s); return; }
+    if (STEPS[guide.i].end) { hideGuide(); return; }
+    showStep(guide.i + 1);
+  };
+  $('guide-back').onclick = () => { if (guide.i > 0) showStep(guide.i - 1, false); };
+  $('guide-skip').onclick = () => hideGuide();
+  $('tour').onclick = () => { $('json').hidden = true; state.t = T(0, 8, 0); showStep(0, false); };
+  document.addEventListener('keydown', (e) => {
+    if (!guide.on || e.target.closest('input,textarea')) return;
+    if (e.key === 'ArrowRight') { e.preventDefault(); $('guide-next').click(); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); $('guide-back').click(); }
+  });
+
+  function renderLensNews() {
+    const t = state.t;
+    document.querySelectorAll('#lens button').forEach((x) => {
+      const p = x.dataset.lens;
+      if (state.lens !== 'ALL' || p === 'ALL') { x.classList.remove('news'); return; }
+      const b = BOX[state.sel];
+      x.classList.toggle('news', byBox[b.id].some((m) => m.to === p && m.t <= t && m.t > Math.max(lastSeen[p] || 0, t - 90)));
+    });
+  }
+
+  function renderUI() {
+    $('clock-d').textContent = dateLabel(state.t);
+    $('clock-t').textContent = hhmm(state.t);
+    renderCard();
+    renderDecl();
+    renderExchange();
+    renderParties();
+    renderAlerts();
+    renderFeed();
+    renderGantt();
+    renderLensNews();
+    renderDoc();
+    renderBox();
+    placeGuide();
+  }
+
+  // ======================================================================= loop
+  let last = performance.now(), lastUi = 0;
+  function frame(now) {
+    const dt = Math.min(0.1, (now - last) / 1000); last = now;
+    if (guide.anim) {
+      const a = guide.anim, u = clamp((now - a.t0) / a.dur, 0, 1), e = u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2;
+      state.t = lerp(a.from, a.to, e);
+      if (u >= 1) { guide.anim = null; state.t = a.to; applyStep(a.step); }
+    } else if (state.playing) { state.t = Math.min(T_END, state.t + state.speed * dt); if (state.t >= T_END) setPlaying(false); }
+    if (uiDirty || now - lastUi > 110) { renderUI(); lastUi = now; uiDirty = false; }
+    drawWires();
+    requestAnimationFrame(frame);
+  }
+  window.addEventListener('resize', () => { deskKey = docKey = boxKey = ''; uiDirty = true; placeGuide(); });
+
+  // hooks for scripted recordings, same shape as the port call simulator
+  const hooks = {
+    state, setView, select, setLens, setPlaying,
+    setTime: (t) => { state.t = t; uiDirty = true; },
+    T, refresh: () => { uiDirty = true; deskKey = cardKey = feedKey = docKey = boxKey = ''; },
+    screen: (kind, id) => {
+      const sr = stage.getBoundingClientRect();
+      if (kind === 'desk') { const el = desks.querySelector(`[data-p="${id}"]`); if (!el) return null; const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
+      if (kind === 'box') { const el = wires.querySelector(`.cbox[data-box="${id}"] rect`); if (!el) return null; const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
+      if (kind === 'field') { const el = document.querySelector(`.doc-row[data-path="${CSS.escape(id)}"]`); if (!el) return null; const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
+      if (kind === 'panel') { const el = $(id); if (!el) return null; const r = el.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; }
+      return { x: sr.left, y: sr.top };
+    },
+    get data() { return { BOXES, MSGS, MOMENTS, STEPS, EV, held, issuedAt, payload }; },
+    params, setParams: (o) => { Object.assign(params, o); rebuild(); },
+    guide: (i) => showStep(i, false), hideGuide,
+    renderNow: () => { deskKey = cardKey = feedKey = docKey = boxKey = ''; renderUI(); drawWires(); },
+  };
+  window.__dgd = hooks; window.__portcall = hooks;
+
+  // start: hash can pick a moment (#gate-stop) or a theme (#dark, #light)
+  const hash = location.hash.replace('#', '');
+  if (hash === 'dark' || hash === 'light') document.documentElement.dataset.theme = hash;
+  select('H');
+  renderWhatIf();
+  if (hash === 'explore') setPlaying(!reduceMotion);
+  else { setPlaying(false); showStep(0, false); }
+  requestAnimationFrame((n) => { last = n; frame(n); });
+})();
+
+</script>
+</body>
+</html>
